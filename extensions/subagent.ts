@@ -25,11 +25,7 @@ import {
   type SubagentHookContractEvidence,
 } from './hook-contract.js';
 import { resolveSubagentRoute } from './launch.js';
-import {
-  prepareSubagentLaunch,
-  SubagentRunSupervisor,
-  type SubagentSpawn,
-} from './runner.js';
+import { prepareSubagentLaunch, SubagentRunSupervisor, type SubagentSpawn } from './runner.js';
 import {
   SUBAGENT_ATTESTED_LAUNCH_DETAILS_SCHEMA_VERSION,
   SUBAGENT_AUTO_DELIVER_MODES,

@@ -84,24 +84,22 @@ function eventStream(cwd: string, answer: string): string {
     totalTokens: 16,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
-  return (
-    [
-      JSON.stringify({ type: 'session', id: 'pi-session-1', cwd }),
-      JSON.stringify({ type: 'agent_start' }),
-      JSON.stringify({
-        type: 'message_end',
-        message: {
-          role: 'assistant',
-          provider: 'openai-codex',
-          model: 'gpt-test',
-          stopReason: 'stop',
-          usage,
-          content: [{ type: 'text', text: answer }],
-        },
-      }),
-      JSON.stringify({ type: 'agent_end' }),
-    ].join('\n') + '\n'
-  );
+  return `${[
+    JSON.stringify({ type: 'session', id: 'pi-session-1', cwd }),
+    JSON.stringify({ type: 'agent_start' }),
+    JSON.stringify({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        provider: 'openai-codex',
+        model: 'gpt-test',
+        stopReason: 'stop',
+        usage,
+        content: [{ type: 'text', text: answer }],
+      },
+    }),
+    JSON.stringify({ type: 'agent_end' }),
+  ].join('\n')}\n`;
 }
 
 async function connectClient(bus: MemoryEventBus): Promise<SubagentBackgroundClient> {

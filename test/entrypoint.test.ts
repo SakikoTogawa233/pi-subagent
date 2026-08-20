@@ -1,17 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-  SessionEntry,
-} from '@earendil-works/pi-coding-agent';
-import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
+import type { ExtensionAPI, ExtensionContext, SessionEntry } from '@earendil-works/pi-coding-agent';
 import { writeFileDurable } from '@sakiko233/pi-agent-runtime';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   buildSubagentResultPackage,
   serializeSubagentResultPackage,
@@ -23,10 +17,8 @@ import {
   SUBAGENT_RESULT_VIEW_SCHEMA_VERSION,
   SUBAGENT_RUN_ATTESTED_TOOL_NAME,
   SUBAGENT_RUN_TOOL_NAME,
-  SubagentError,
-  type SubagentPinnedRoute,
 } from '../extensions/types.js';
-import { MemoryEventBus, makeFakeSpawn, StubService } from './helpers/fakes.js';
+import { MemoryEventBus, makeFakeSpawn, StubPi, StubService } from './helpers/fakes.js';
 
 const roots: string[] = [];
 
@@ -41,62 +33,6 @@ const codexModel = {
   api: 'openai-responses',
   contextWindow: 200_000,
 };
-
-interface CapturedTool {
-  name: string;
-  parameters: Record<string, unknown>;
-  prepareArguments?: (args: unknown) => unknown;
-  execute: (
-    toolCallId: string,
-    params: never,
-    signal: undefined,
-    onUpdate: undefined,
-    ctx: ExtensionContext,
-  ) => Promise<{
-    content: Array<{ type: string; text?: string }>;
-    details?: Record<string, unknown>;
-    usage?: unknown;
-  }>;
-}
-
-class StubPi {
-  readonly events: MemoryEventBus;
-
-  constructor(events: MemoryEventBus) {
-    this.events = events;
-  }
-  readonly tools = new Map<string, CapturedTool>();
-  readonly sentMessages: Array<{ message: Record<string, unknown>; options: unknown }> = [];
-  readonly notifications: Array<{ text: string; level: string }> = [];
-  private readonly handlers = new Map<string, Array<(...args: never[]) => unknown>>();
-
-  registerTool(definition: CapturedTool): void {
-    if (this.tools.has(definition.name)) {
-      throw new Error(`tool ${definition.name} registered twice`);
-    }
-    this.tools.set(definition.name, definition);
-  }
-
-  on(event: string, handler: (...args: never[]) => unknown): void {
-    const list = this.handlers.get(event) ?? [];
-    list.push(handler);
-    this.handlers.set(event, list);
-  }
-
-  getThinkingLevel(): string {
-    return 'medium';
-  }
-
-  sendMessage(message: Record<string, unknown>, options: unknown): void {
-    this.sentMessages.push({ message, options });
-  }
-
-  async emitSessionEvent(event: 'session_start' | 'session_shutdown', ctx: unknown): Promise<void> {
-    for (const handler of this.handlers.get(event) ?? []) {
-      await handler({} as never, ctx as never);
-    }
-  }
-}
 
 function stubCtx(cwd: string, ui = false): ExtensionContext {
   const entries: SessionEntry[] = [
@@ -120,9 +56,7 @@ function stubCtx(cwd: string, ui = false): ExtensionContext {
     modelRegistry: {
       getAll: () => [model, codexModel],
       find: (provider: string, modelId: string) =>
-        [model, codexModel].find(
-          (entry) => entry.provider === provider && entry.id === modelId,
-        ),
+        [model, codexModel].find((entry) => entry.provider === provider && entry.id === modelId),
       isUsingOAuth: () => true,
     },
     sessionManager: {
@@ -191,7 +125,9 @@ async function commitChildResult(
     taskId: identity.taskId,
     launchNonce: identity.launchNonce,
     seedSha256: identity.seedSha256,
-    directiveSha256: createHash('sha256').update(Buffer.from('Investigate the thing', 'utf8')).digest('hex'),
+    directiveSha256: createHash('sha256')
+      .update(Buffer.from('Investigate the thing', 'utf8'))
+      .digest('hex'),
     route: { provider: model.provider, model: model.id },
     routeAttestations: [{ provider: model.provider, model: model.id, stop_reason: 'stop' }],
     stopReason: 'stop',

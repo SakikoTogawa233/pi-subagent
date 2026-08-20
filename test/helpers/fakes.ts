@@ -353,3 +353,59 @@ export function makeFakeSpawn(): {
     },
   };
 }
+
+export interface CapturedTool {
+  name: string;
+  parameters: Record<string, unknown>;
+  prepareArguments?: (args: unknown) => unknown;
+  execute: (
+    toolCallId: string,
+    params: never,
+    signal: undefined,
+    onUpdate: undefined,
+    ctx: unknown,
+  ) => Promise<{
+    content: Array<{ type: string; text?: string }>;
+    details?: Record<string, unknown>;
+    usage?: unknown;
+  }>;
+}
+
+/** Minimal ExtensionAPI stand-in capturing tool registrations and event handlers. */
+export class StubPi {
+  readonly events: EventBus;
+  readonly tools = new Map<string, CapturedTool>();
+  readonly sentMessages: Array<{ message: Record<string, unknown>; options: unknown }> = [];
+  private readonly handlers = new Map<string, Array<(...args: never[]) => unknown>>();
+
+  constructor(events: EventBus) {
+    this.events = events as MemoryEventBus;
+  }
+
+  registerTool(definition: CapturedTool): void {
+    if (this.tools.has(definition.name)) {
+      throw new Error(`tool ${definition.name} registered twice`);
+    }
+    this.tools.set(definition.name, definition);
+  }
+
+  on(event: string, handler: (...args: never[]) => unknown): void {
+    const list = this.handlers.get(event) ?? [];
+    list.push(handler);
+    this.handlers.set(event, list);
+  }
+
+  getThinkingLevel(): string {
+    return 'medium';
+  }
+
+  sendMessage(message: Record<string, unknown>, options: unknown): void {
+    this.sentMessages.push({ message, options });
+  }
+
+  async emitSessionEvent(event: 'session_start' | 'session_shutdown', ctx: unknown): Promise<void> {
+    for (const handler of this.handlers.get(event) ?? []) {
+      await handler({} as never, ctx as never);
+    }
+  }
+}

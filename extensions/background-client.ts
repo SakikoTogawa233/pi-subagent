@@ -362,7 +362,9 @@ export class SubagentBackgroundClient {
       ...this.identity(),
       owner_ref: options.ownerRef,
       name: options.name,
-      description: options.description,
+      // Optional keys are omitted, never sent as undefined: the service treats
+      // a present key with an undefined value as a contract violation.
+      ...(options.description === undefined ? {} : { description: options.description }),
       capabilities: {
         cancellable: options.cancellable,
         rerunnable: options.rerunnable,
