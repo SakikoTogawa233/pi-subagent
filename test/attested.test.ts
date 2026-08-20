@@ -5,7 +5,25 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { canonicalJson } from '@sakiko233/pi-agent-runtime';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+
+// Deterministic seam for the pre-spawn race tests: the first durable evidence
+// write in SubagentAttestedSupervisor.start happens after registration and
+// before the child is spawned. Firing a hook there lands a cancellation or
+// shutdown exactly inside the registration→spawn window.
+const preSpawnHook = vi.hoisted(() => ({ fire: undefined as (() => void) | undefined }));
+vi.mock('@sakiko233/pi-agent-runtime', async (importActual) => {
+  const actual = await importActual<typeof import('@sakiko233/pi-agent-runtime')>();
+  return {
+    ...actual,
+    writeFileDurable: async (path: string, data: Parameters<typeof actual.writeFileDurable>[1]) => {
+      const hook = preSpawnHook.fire;
+      preSpawnHook.fire = undefined;
+      hook?.();
+      return actual.writeFileDurable(path, data);
+    },
+  };
+});
 import {
   buildSubagentAttestedArgv,
   buildSubagentPiAttestation,
@@ -464,6 +482,85 @@ describe('SubagentAttestedSupervisor', () => {
     expect(ops.indexOf('settle')).toBeGreaterThan(ops.indexOf('cancel_ack'));
     const ackFrame = service.frames.find((frame) => frame.operation === 'cancel_ack');
     expect(ackFrame?.payload?.['cancel_id']).toBe(cancelId);
+    expect(service.tasks.get(record.serviceTaskId)?.status).toBe('killed');
+    expect(existsSync(record.paths.attestationAbsPath)).toBe(false);
+  });
+
+  it('settles a pre-spawn cancellation as killed without spawning an orphan child', async () => {
+    const cwd = await tempRepo();
+    const bus = new MemoryEventBus();
+    const service = new StubService(bus);
+    const client = await connectClient(bus);
+    const { spawn, fake } = makeFakeSpawn();
+    const groupKills: Array<[number, string | undefined]> = [];
+    const supervisor = new SubagentAttestedSupervisor({
+      client,
+      spawn,
+      killProcess: (pid, signal) => {
+        groupKills.push([pid, signal as string | undefined]);
+        return true;
+      },
+      platform: 'linux',
+      killGraceMs: 20,
+    });
+    let cancelId: string | undefined;
+    const startPromise = supervisor.start({
+      request: request(),
+      cwd,
+      modelRegistry: oauthRegistry(),
+    });
+    preSpawnHook.fire = () => {
+      const serviceTaskId = [...service.tasks.keys()][0];
+      if (serviceTaskId === undefined) throw new Error('registration did not happen pre-spawn');
+      cancelId = service.publishCancellation(serviceTaskId, 'user');
+    };
+    const record = await startPromise;
+    expect(cancelId).toBeDefined();
+    // If the race orphaned a child, close it so the run can settle at all.
+    fake.children[0]?.close(0);
+    const settled = await supervisor.whenSettled(record.id);
+    expect(settled.state).toBe('killed');
+    // The cancelled child must never have been spawned.
+    expect(fake.calls).toHaveLength(0);
+    expect(groupKills).toHaveLength(0);
+    const ops = service.operationsFor(record.serviceTaskId);
+    expect(ops.indexOf('cancel_ack')).toBeGreaterThanOrEqual(0);
+    expect(ops.indexOf('settle')).toBeGreaterThan(ops.indexOf('cancel_ack'));
+    const ackFrame = service.frames.find((frame) => frame.operation === 'cancel_ack');
+    expect(ackFrame?.payload?.['cancel_id']).toBe(cancelId);
+    expect(service.tasks.get(record.serviceTaskId)?.status).toBe('killed');
+    expect(existsSync(record.paths.attestationAbsPath)).toBe(false);
+  });
+
+  it('settles a pre-spawn shutdown as killed without spawning an orphan child', async () => {
+    const cwd = await tempRepo();
+    const bus = new MemoryEventBus();
+    const service = new StubService(bus);
+    const client = await connectClient(bus);
+    const { spawn, fake } = makeFakeSpawn();
+    const supervisor = new SubagentAttestedSupervisor({
+      client,
+      spawn,
+      killProcess: () => true,
+      platform: 'linux',
+      killGraceMs: 20,
+    });
+    let shutdownPromise: Promise<void> | undefined;
+    const startPromise = supervisor.start({
+      request: request(),
+      cwd,
+      modelRegistry: oauthRegistry(),
+    });
+    preSpawnHook.fire = () => {
+      shutdownPromise = supervisor.shutdown('session ended');
+    };
+    const record = await startPromise;
+    fake.children[0]?.close(0);
+    await shutdownPromise;
+    const settled = await supervisor.whenSettled(record.id);
+    expect(settled.state).toBe('killed');
+    expect(settled.error).toBe('session ended');
+    expect(fake.calls).toHaveLength(0);
     expect(service.tasks.get(record.serviceTaskId)?.status).toBe('killed');
     expect(existsSync(record.paths.attestationAbsPath)).toBe(false);
   });
