@@ -292,6 +292,66 @@ describe('subagent_run and subagent_result through the entrypoint', () => {
     expect(second.details?.['usage_delivered']).toBe(false);
   });
 
+  it('attaches usage exactly once when the answer is delivered as an artifact', async () => {
+    const h = harness(true);
+    const cwd = await tempCwd();
+    await h.start(cwd);
+    const ctx = stubCtx(cwd);
+    const runTool = h.pi.tools.get(SUBAGENT_RUN_TOOL_NAME);
+    if (runTool === undefined) throw new Error('missing subagent_run');
+    const receipt = await runTool.execute(
+      'call-1',
+      { name: 'Artifact usage', prompt: 'Investigate the thing' } as never,
+      undefined,
+      undefined,
+      ctx,
+    );
+    const details = receipt.details ?? {};
+    const subagentTaskId = details['task_id'] as string;
+    const artifactDir = details['artifact_dir'] as string;
+    const identity = {
+      taskId: subagentTaskId,
+      launchNonce: details['launch_nonce'] as string,
+      seedSha256: details['seed_sha256'] as string,
+    };
+    await commitChildResult(join(cwd, artifactDir), identity, 'the verified answer');
+    h.fake.children[0]?.close(0);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const resultTool = h.pi.tools.get(SUBAGENT_RESULT_TOOL_NAME);
+    if (resultTool === undefined) throw new Error('missing subagent_result');
+
+    // First artifact-mode retrieval attaches usage to the returned result and
+    // says so honestly in the header and the details view.
+    const first = await resultTool.execute(
+      'call-2',
+      { taskId: subagentTaskId, delivery: 'artifact' } as never,
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(first.details?.['state']).toBe('committed');
+    expect(first.details?.['delivery']).toBe('artifact');
+    expect(first.details?.['usage_delivered']).toBe(true);
+    expect(first.usage).toBeDefined();
+    expect(first.content[0]?.text).toContain('Delivery: artifact');
+    expect(first.content[0]?.text).toContain('Usage: attached to this retrieval exactly once.');
+
+    // The latch is consumed by that attachment: a second artifact-mode
+    // retrieval attaches nothing and says so.
+    const second = await resultTool.execute(
+      'call-3',
+      { taskId: subagentTaskId, delivery: 'artifact' } as never,
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(second.details?.['delivery']).toBe('artifact');
+    expect(second.details?.['usage_delivered']).toBe(false);
+    expect(second.usage).toBeUndefined();
+    expect(second.content[0]?.text).toContain('already attached by an earlier retrieval');
+  });
+
   it('fails loudly when inline delivery is requested for an oversized answer', async () => {
     const h = harness(true);
     const cwd = await tempCwd();
