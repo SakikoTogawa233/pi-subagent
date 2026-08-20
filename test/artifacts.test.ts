@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -145,6 +145,23 @@ describe('subagent artifact store', () => {
     );
     const range = await store.readSpillRange(receipt.artifact, 1, 6);
     expect(range.bytes.toString('utf8')).toBe('ayload');
+  });
+
+  it('reads contained dot-prefixed paths and refuses only real escapes', async () => {
+    // Containment is lexical and exact: a segment like `..cache` names a real
+    // entry inside the root and must be readable, while `..` itself is a real
+    // escape and stays refused. This pins the canonical pathInside semantics
+    // shared with pi-agent-runtime.
+    const cwd = await freshCwd();
+    const store = await createStore(cwd);
+    await mkdir(join(store.artifactDirAbs, '..cache'), { recursive: true });
+    await writeFile(join(store.artifactDirAbs, '..cache', 'note.bin'), 'contained');
+    const range = await store.readSpillRange(join('..cache', 'note.bin'), 0, 9);
+    expect(range.bytes.toString('utf8')).toBe('contained');
+    expect(range.totalBytes).toBe(9);
+    await expect(store.readSpillRange(join('..', 'escape.bin'), 0, 1)).rejects.toThrow(
+      /escapes the subagent artifact directory/,
+    );
   });
 
   it('records terminal outcomes and failures without claiming success', async () => {

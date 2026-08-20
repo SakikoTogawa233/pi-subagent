@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ExtensionAPI, SessionEntry } from '@earendil-works/pi-coding-agent';
@@ -197,6 +197,27 @@ describe('subagent child guard', () => {
     } finally {
       if (previous !== undefined) process.env['PI_SUBAGENT_ARTIFACT_DIR'] = previous;
     }
+  });
+
+  it('reads contained dot-prefixed artifact paths and refuses only real escapes', async () => {
+    // Same canonical containment as the parent-side store: `..cache` is a
+    // real entry inside the artifact directory, `..` is a real escape.
+    const h = await childHarness();
+    await mkdir(join(h.artifactDirAbs, '..cache'), { recursive: true });
+    await writeFile(join(h.artifactDirAbs, '..cache', 'note.bin'), 'contained');
+    const tool = h.tools.get('subagent_read_artifact');
+    if (tool === undefined) throw new Error('missing subagent_read_artifact');
+    const result = (await tool.execute('call-r1', {
+      artifact: join('..cache', 'note.bin'),
+      offset: 0,
+      length: 9,
+    })) as { content: Array<{ type: string; text: string }> };
+    expect(result.content[0]?.text).toContain(
+      Buffer.from('contained', 'utf8').toString('base64'),
+    );
+    await expect(
+      tool.execute('call-r2', { artifact: join('..', 'escape.bin'), offset: 0, length: 1 }),
+    ).rejects.toThrow(/escapes the subagent artifact directory/);
   });
 
   it('commits exactly one verified result package on agent_end', async () => {
