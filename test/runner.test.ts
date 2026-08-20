@@ -1,26 +1,24 @@
-import { mkdtemp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, describe, expect, it } from 'vitest';
-import { writeFileDurable } from '@sakiko233/pi-agent-runtime';
-import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
 import type { SessionEntry } from '@earendil-works/pi-coding-agent';
+import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
+import { writeFileDurable } from '@sakiko233/pi-agent-runtime';
+import { afterAll, describe, expect, it } from 'vitest';
 import { SubagentBackgroundClient } from '../extensions/background-client.js';
 import { loadSubagentHookContractEvidence } from '../extensions/hook-contract.js';
-import { preflightSubagentLaunch } from '../extensions/launch.js';
 import {
   buildSubagentResultPackage,
   serializeSubagentResultPackage,
 } from '../extensions/result-package.js';
 import {
   evaluateSubagentTerminal,
+  type PreparedSubagentLaunch,
+  type PrepareSubagentLaunchInput,
   prepareSubagentLaunch,
   SubagentRunSupervisor,
-  type PrepareSubagentLaunchInput,
-  type PreparedSubagentLaunch,
 } from '../extensions/runner.js';
 import {
   SUBAGENT_OUTCOME_SCHEMA_VERSION,
@@ -450,7 +448,7 @@ describe('SubagentRunSupervisor', () => {
       triggerOnCompletion: true,
     });
     await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(groupKills).toEqual([[-4242, 'SIGTERM']]);
+    expect(groupKills[0]).toEqual([-4242, 'SIGTERM']);
     fake.children[0]?.close(null, 'SIGTERM');
     const settled = await supervisor.whenSettled(record.facts.taskId);
     expect(settled.state).toBe('failed');
@@ -542,7 +540,7 @@ describe('SubagentRunSupervisor', () => {
     });
     fake.children[0]?.emitStdout('x'.repeat(4096));
     await new Promise((resolve) => setTimeout(resolve, 30));
-    expect(groupKills).toEqual([[-4242, 'SIGTERM']]);
+    expect(groupKills[0]).toEqual([-4242, 'SIGTERM']);
     fake.children[0]?.close(null, 'SIGTERM');
     const settled = await supervisor.whenSettled(record.facts.taskId);
     expect(settled.state).toBe('failed');

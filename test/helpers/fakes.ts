@@ -1,13 +1,13 @@
-import { EventEmitter } from 'node:events';
 import { randomBytes } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import type { EventBus } from '@earendil-works/pi-coding-agent';
 import {
+  type ExternalTaskSnapshot,
   V2_CANCEL_CHANNEL,
   V2_REQUEST_CHANNEL,
   V2_REQUEST_SCHEMA,
   V2_RESPONSE_CHANNEL,
   V2_RESPONSE_SCHEMA,
-  type ExternalTaskSnapshot,
 } from '../../extensions/background-client.js';
 
 /**
@@ -284,10 +284,7 @@ export class FakeChild {
   private stdinErrorListener: ((error: Error) => void) | undefined;
 
   on(event: 'error', listener: (error: Error) => void): this;
-  on(
-    event: 'close',
-    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
-  ): this;
+  on(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
   on(event: string, listener: (...args: never[]) => void): this {
     this.emitter.on(event, listener as (...args: unknown[]) => void);
     return this;
@@ -322,7 +319,11 @@ export class FakeChild {
 export interface FakeSpawnCall {
   command: string;
   args: string[];
-  options: { env?: NodeJS.ProcessEnv; cwd?: string; detached?: boolean };
+  options: {
+    env?: NodeJS.ProcessEnv | undefined;
+    cwd?: string | URL | undefined;
+    detached?: boolean | undefined;
+  };
 }
 
 export interface FakeSpawn {
