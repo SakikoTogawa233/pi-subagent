@@ -4,8 +4,8 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
 import { canonicalJson } from '@sakiko233/pi-agent-runtime';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   buildSubagentAttestedArgv,
   buildSubagentPiAttestation,
@@ -15,11 +15,11 @@ import {
   observeSubagentPiOAuth,
   parseSubagentPiJsonEvents,
   resolveSubagentReportPath,
-  subagentAttestedChildEnv,
-  SubagentAttestedSupervisor,
-  SUBAGENT_ATTESTED_TASK_ID_PATTERN,
-  validateSubagentAttestedLaunchRequest,
   type StructuredSubagentPiLaunchRequest,
+  SUBAGENT_ATTESTED_TASK_ID_PATTERN,
+  SubagentAttestedSupervisor,
+  subagentAttestedChildEnv,
+  validateSubagentAttestedLaunchRequest,
 } from '../extensions/attested.js';
 import { SubagentBackgroundClient } from '../extensions/background-client.js';
 import { SUBAGENT_ATTESTATION_SCHEMA_VERSION } from '../extensions/types.js';
@@ -38,6 +38,10 @@ async function tempRepo(): Promise<string> {
   execFileSync('git', ['config', 'user.email', 'test@example.invalid'], { cwd: dir });
   execFileSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
   await writeFile(join(dir, 'README.md'), 'fixture\n');
+  // The attested contract requires a clean worktree at start and finish; the
+  // report and the evidence store are ignored exactly as in the source repo's
+  // attested-run fixtures.
+  await writeFile(join(dir, '.gitignore'), '.pi/\nreport.md\ndocs/\n');
   execFileSync('git', ['add', '.'], { cwd: dir });
   execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: dir });
   return dir;
@@ -58,7 +62,9 @@ function oauthRegistry(models = [oauthModel]) {
   };
 }
 
-function request(overrides: Partial<StructuredSubagentPiLaunchRequest> = {}): StructuredSubagentPiLaunchRequest {
+function request(
+  overrides: Partial<StructuredSubagentPiLaunchRequest> = {},
+): StructuredSubagentPiLaunchRequest {
   return {
     name: 'Attested probe',
     provider: 'openai-codex',
@@ -78,22 +84,24 @@ function eventStream(cwd: string, answer: string): string {
     totalTokens: 16,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
-  return [
-    JSON.stringify({ type: 'session', id: 'pi-session-1', cwd }),
-    JSON.stringify({ type: 'agent_start' }),
-    JSON.stringify({
-      type: 'message_end',
-      message: {
-        role: 'assistant',
-        provider: 'openai-codex',
-        model: 'gpt-test',
-        stopReason: 'stop',
-        usage,
-        content: [{ type: 'text', text: answer }],
-      },
-    }),
-    JSON.stringify({ type: 'agent_end' }),
-  ].join('\n') + '\n';
+  return (
+    [
+      JSON.stringify({ type: 'session', id: 'pi-session-1', cwd }),
+      JSON.stringify({ type: 'agent_start' }),
+      JSON.stringify({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          provider: 'openai-codex',
+          model: 'gpt-test',
+          stopReason: 'stop',
+          usage,
+          content: [{ type: 'text', text: answer }],
+        },
+      }),
+      JSON.stringify({ type: 'agent_end' }),
+    ].join('\n') + '\n'
+  );
 }
 
 async function connectClient(bus: MemoryEventBus): Promise<SubagentBackgroundClient> {
@@ -130,7 +138,9 @@ describe('attested request validation and launch shape', () => {
   });
 
   it('builds the pinned argv with the prompt last and attribution first for Anthropic', () => {
-    const argv = buildSubagentAttestedArgv(request({ thinking: 'high', extraPiArgs: ['--verbose'] }));
+    const argv = buildSubagentAttestedArgv(
+      request({ thinking: 'high', extraPiArgs: ['--verbose'] }),
+    );
     expect(argv.slice(0, 6)).toEqual([
       'pi',
       '--mode',
@@ -207,9 +217,13 @@ describe('OAuth observation and event parsing', () => {
       ),
     ).toThrow(/OAuth/);
     expect(() =>
-      observeSubagentPiOAuth(oauthRegistry([
-        { provider: 'deepseek', id: 'r1', api: 'deepseek-api', contextWindow: 64_000 },
-      ]), 'deepseek', 'r1'),
+      observeSubagentPiOAuth(
+        oauthRegistry([
+          { provider: 'deepseek', id: 'r1', api: 'deepseek-api', contextWindow: 64_000 },
+        ]),
+        'deepseek',
+        'r1',
+      ),
     ).toThrow(/Unsupported/);
   });
 
@@ -267,6 +281,8 @@ describe('attestation sidecar', () => {
       finishAuthority: authority,
       parsedEvents: parsed,
       auth,
+      authProvider: 'openai-codex',
+      authModelId: 'gpt-test',
       prompt: Buffer.from('prompt', 'utf8'),
       reportAbsPath,
       lifecycle: {
@@ -293,9 +309,9 @@ describe('attestation sidecar', () => {
     const wrongModel = parseSubagentPiJsonEvents(
       Buffer.from(eventStream(cwd, 'a').replaceAll('"gpt-test"', '"gpt-other"'), 'utf8'),
     );
-    await expect(
-      buildSubagentPiAttestation({ ...base, parsedEvents: wrongModel }),
-    ).rejects.toThrow(/provider\/model/);
+    await expect(buildSubagentPiAttestation({ ...base, parsedEvents: wrongModel })).rejects.toThrow(
+      /provider\/model/,
+    );
 
     const attestation = await buildSubagentPiAttestation(base);
     expect(attestation['schema_version']).toBe(SUBAGENT_ATTESTATION_SCHEMA_VERSION);
@@ -303,7 +319,9 @@ describe('attestation sidecar', () => {
     expect(typeof selfHash).toBe('string');
     const withoutSelf = { ...attestation };
     Reflect.deleteProperty(withoutSelf, 'attestation_sha256');
-    const recomputed = `sha256:${createHash('sha256').update(Buffer.from(canonicalJson(withoutSelf), 'utf8')).digest('hex')}`;
+    const recomputed = `sha256:${createHash('sha256')
+      .update(Buffer.from(canonicalJson(withoutSelf), 'utf8'))
+      .digest('hex')}`;
     expect(selfHash).toBe(recomputed);
   });
 });
