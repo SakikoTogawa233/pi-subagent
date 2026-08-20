@@ -29,6 +29,7 @@ import {
 import { SUBAGENT_FORBIDDEN_TOOLS } from '../extensions/removed-surface.js';
 import {
   SUBAGENT_INSPECT_TOOLS,
+  SUBAGENT_TASK_ID_PATTERN,
   SubagentError,
   type SubagentPinnedRoute,
 } from '../extensions/types.js';
@@ -145,6 +146,14 @@ describe('subagent route resolution', () => {
 });
 
 describe('subagent child isolation surface', () => {
+  it('keeps SUBAGENT_TASK_ID_PATTERN canonical in types.ts only', async () => {
+    // The pattern has exactly one definition; launch.ts generates ids but
+    // does not own a second copy.
+    const launchModule = (await import('../extensions/launch.js')) as Record<string, unknown>;
+    expect('SUBAGENT_TASK_ID_PATTERN' in launchModule).toBe(false);
+    expect(SUBAGENT_TASK_ID_PATTERN.test(makeSubagentTaskId())).toBe(true);
+  });
+
   it('resolves the child guard and attribution loader paths from this package', () => {
     const childExtension = resolveSubagentChildExtensionPath();
     expect(
