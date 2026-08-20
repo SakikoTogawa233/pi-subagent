@@ -35,6 +35,12 @@ afterAll(async () => {
 });
 
 const model = { provider: 'test-provider', id: 'test-model', contextWindow: 200_000 };
+const codexModel = {
+  provider: 'openai-codex',
+  id: 'gpt-test',
+  api: 'openai-responses',
+  contextWindow: 200_000,
+};
 
 interface CapturedTool {
   name: string;
@@ -54,7 +60,11 @@ interface CapturedTool {
 }
 
 class StubPi {
-  readonly events = new MemoryEventBus();
+  readonly events: MemoryEventBus;
+
+  constructor(events: MemoryEventBus) {
+    this.events = events;
+  }
   readonly tools = new Map<string, CapturedTool>();
   readonly sentMessages: Array<{ message: Record<string, unknown>; options: unknown }> = [];
   readonly notifications: Array<{ text: string; level: string }> = [];
@@ -83,7 +93,7 @@ class StubPi {
 
   async emitSessionEvent(event: 'session_start' | 'session_shutdown', ctx: unknown): Promise<void> {
     for (const handler of this.handlers.get(event) ?? []) {
-      await handler({}, ctx as never);
+      await handler({} as never, ctx as never);
     }
   }
 }
@@ -108,9 +118,11 @@ function stubCtx(cwd: string, ui = false): ExtensionContext {
     },
     model,
     modelRegistry: {
-      getAll: () => [model],
+      getAll: () => [model, codexModel],
       find: (provider: string, modelId: string) =>
-        provider === model.provider && modelId === model.id ? model : undefined,
+        [model, codexModel].find(
+          (entry) => entry.provider === provider && entry.id === modelId,
+        ),
       isUsingOAuth: () => true,
     },
     sessionManager: {
@@ -136,7 +148,7 @@ function harness(withService: boolean): Harness {
   const bus = new MemoryEventBus();
   const service = withService ? new StubService(bus) : undefined;
   const { spawn, fake } = makeFakeSpawn();
-  const pi = new StubPi();
+  const pi = new StubPi(bus);
   const errors: string[] = [];
   const extension = createSubagentExtension({
     spawn,
@@ -452,8 +464,8 @@ describe('subagent_run_attested through the entrypoint', () => {
       'call-1',
       {
         name: 'Attested probe',
-        provider: 'test-provider',
-        model: 'test-model',
+        provider: 'openai-codex',
+        model: 'gpt-test',
         prompt: 'Write the report file, then stop.',
         reportPath: 'report.md',
       } as never,
