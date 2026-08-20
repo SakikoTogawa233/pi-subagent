@@ -203,6 +203,8 @@ describe('subagent child guard', () => {
     // Same canonical containment as the parent-side store: `..cache` is a
     // real entry inside the artifact directory, `..` is a real escape.
     const h = await childHarness();
+    // Establish the retained-growth budget so the reader has inline runway.
+    fireHook(h, 'context', { messages: [] }, fakeCtx());
     await mkdir(join(h.artifactDirAbs, '..cache'), { recursive: true });
     await writeFile(join(h.artifactDirAbs, '..cache', 'note.bin'), 'contained');
     const tool = h.tools.get('subagent_read_artifact');
@@ -215,9 +217,9 @@ describe('subagent child guard', () => {
     expect(result.content[0]?.text).toContain(
       Buffer.from('contained', 'utf8').toString('base64'),
     );
-    await expect(
+    expect(() =>
       tool.execute('call-r2', { artifact: join('..', 'escape.bin'), offset: 0, length: 1 }),
-    ).rejects.toThrow(/escapes the subagent artifact directory/);
+    ).toThrow(/escapes the subagent artifact directory/);
   });
 
   it('commits exactly one verified result package on agent_end', async () => {

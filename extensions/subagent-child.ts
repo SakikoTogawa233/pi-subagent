@@ -8,10 +8,10 @@ import {
   renameSync,
   writeSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Usage } from '@earendil-works/pi-ai';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { utf8ByteClassBreakdown } from '@sakiko233/pi-agent-runtime';
+import { pathInside, utf8ByteClassBreakdown } from '@sakiko233/pi-agent-runtime';
 import { type Static, Type } from 'typebox';
 import { subagentSpillArtifactPath } from './artifacts.js';
 import {
@@ -290,13 +290,6 @@ function readEnv(key: string): string {
     throw new Error(`subagent child requires ${key}`);
   }
   return value;
-}
-
-function pathInside(parent: string, child: string): boolean {
-  const rel = relative(parent, child);
-  return (
-    rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.split(sep).includes('..'))
-  );
 }
 
 /** Synchronous durable commit: temp write, fsync, rename, directory fsync. */

@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
-import { basename, isAbsolute, join, posix, relative, sep } from 'node:path';
-import { canonicalJson, replaceFileDurable, writeFileDurable } from '@sakiko233/pi-agent-runtime';
+import { basename, join, posix } from 'node:path';
+import {
+  canonicalJson,
+  pathInside,
+  replaceFileDurable,
+  writeFileDurable,
+} from '@sakiko233/pi-agent-runtime';
 import type { SubagentAdmissionPlanV1 } from './budget.js';
 import { sanitizePathSegment } from './common.js';
 import {
@@ -92,13 +97,6 @@ export type SubagentManifestState = (typeof SUBAGENT_MANIFEST_STATES)[number];
 
 function sha256Bytes(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
-}
-
-function pathInside(parent: string, child: string): boolean {
-  const rel = relative(parent, child);
-  return (
-    rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.split(sep).includes('..'))
-  );
 }
 
 function artifactError(message: string, cause?: unknown): SubagentError {
