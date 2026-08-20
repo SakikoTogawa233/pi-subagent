@@ -6,6 +6,14 @@ import { buildSubagentSeed, verifySubagentSeedBytes } from '../extensions/seed.j
 import type { SubagentPinnedRoute } from '../extensions/types.js';
 import { SubagentError } from '../extensions/types.js';
 
+function taskIdHex(char: string): string {
+  return `s${char.repeat(32)}`;
+}
+
+function nonceHex(char: string): string {
+  return `${char.repeat(32)}`;
+}
+
 const route: SubagentPinnedRoute = {
   provider: 'test-provider',
   model: 'test-model',
@@ -69,8 +77,8 @@ const baseEntries: readonly SessionEntry[] = [
 describe('subagent seed construction', () => {
   it('freezes the projected conversation and the authoritative directive', () => {
     const built = buildSubagentSeed(parentContext(baseEntries), {
-      taskId: 's' + 'a'.repeat(32),
-      launchNonce: 'n'.repeat(32),
+      taskId: taskIdHex("a"),
+      launchNonce: nonceHex("n"),
       toolCallId: 'call-1',
       directive: 'find the root cause of the incident',
       capability: 'inspect',
@@ -112,8 +120,8 @@ describe('subagent seed construction', () => {
       assistantEntryWithToolCalls('e4', 'e3', ['call-1', 'call-2']),
     ];
     const built = buildSubagentSeed(parentContext(withCall), {
-      taskId: 's' + 'a'.repeat(32),
-      launchNonce: 'n'.repeat(32),
+      taskId: taskIdHex("a"),
+      launchNonce: nonceHex("n"),
       toolCallId: 'call-1',
       directive: 'directive',
       capability: 'inspect',
@@ -128,8 +136,8 @@ describe('subagent seed construction', () => {
     expect(built.seed.conversation_projection.branch_filter.tool_call_id).toBe('call-1');
     expect(built.serialized).not.toContain('launching the subagents now');
     const sibling = buildSubagentSeed(parentContext(withCall), {
-      taskId: 's' + 'b'.repeat(32),
-      launchNonce: 'm'.repeat(32),
+      taskId: taskIdHex("b"),
+      launchNonce: nonceHex("m"),
       toolCallId: 'call-2',
       directive: 'sibling directive',
       capability: 'inspect',
@@ -147,8 +155,8 @@ describe('subagent seed construction', () => {
     let failure: unknown;
     try {
       buildSubagentSeed(parentContext(baseEntries), {
-        taskId: 's' + 'a'.repeat(32),
-        launchNonce: 'n'.repeat(32),
+        taskId: taskIdHex("a"),
+        launchNonce: nonceHex("n"),
         toolCallId: 'call-1',
         directive: '   ',
         capability: 'inspect',
@@ -166,8 +174,8 @@ describe('subagent seed construction', () => {
 
 describe('subagent seed verification (child side)', () => {
   const built = buildSubagentSeed(parentContext(baseEntries), {
-    taskId: 's' + 'a'.repeat(32),
-    launchNonce: 'n'.repeat(32),
+    taskId: taskIdHex("a"),
+    launchNonce: nonceHex("n"),
     toolCallId: 'call-1',
     directive: 'the directive',
     capability: 'inspect',
@@ -176,19 +184,12 @@ describe('subagent seed verification (child side)', () => {
     limits: resolveSubagentLimits(route),
   });
 
-  function verify(
-    raw: string,
-    expected: { sha256: string; taskId: string; launchNonce: string },
-  ): unknown {
-    return verifySubagentSeedBytes(raw, expected);
-  }
-
   it('accepts the exact frozen bytes and rebuilds every consumed field', () => {
     const seed = verifySubagentSeedBytes(built.serialized, {
       sha256: built.sha256,
       taskId: built.seed.task_id,
       launchNonce: built.seed.launch_nonce,
-    }) as ReturnType<typeof verifySubagentSeedBytes>;
+    });
     expect(seed.capability).toBe('inspect');
     expect(seed.extension_mode).toBe('isolated');
     expect(seed.route.provider).toBe('test-provider');
@@ -225,7 +226,7 @@ describe('subagent seed verification (child side)', () => {
       try {
         verifySubagentSeedBytes(built.serialized, {
           sha256: built.sha256,
-          taskId: 's' + 'z'.repeat(32),
+          taskId: taskIdHex("z"),
           launchNonce: built.seed.launch_nonce,
         });
       } catch (error) {
