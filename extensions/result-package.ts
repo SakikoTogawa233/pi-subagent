@@ -3,8 +3,8 @@ import { canonicalJson } from '@sakiko233/pi-agent-runtime';
 import {
   SUBAGENT_RECEIPT_SCHEMA_VERSION,
   SUBAGENT_RESULT_PACKAGE_SCHEMA_VERSION,
-  SubagentError,
   type SubagentAnswerBlock,
+  SubagentError,
   type SubagentResultPackageV1,
   type SubagentRouteAttestation,
   type SubagentSpillReceipt,
@@ -87,9 +87,7 @@ export function buildSubagentResultPackage(
       data_base64: bytes.toString('base64'),
     };
   });
-  const aggregate = Buffer.concat(
-    blocks.map((block) => Buffer.from(block.data_base64, 'base64')),
-  );
+  const aggregate = Buffer.concat(blocks.map((block) => Buffer.from(block.data_base64, 'base64')));
   return {
     schema_version: SUBAGENT_RESULT_PACKAGE_SCHEMA_VERSION,
     task_id: input.taskId,
@@ -137,11 +135,7 @@ function requireString(record: Record<PropertyKey, unknown>, key: string, taskId
   return value;
 }
 
-function requireInteger(
-  record: Record<PropertyKey, unknown>,
-  key: string,
-  taskId: string,
-): number {
+function requireInteger(record: Record<PropertyKey, unknown>, key: string, taskId: string): number {
   const value = record[key];
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
     fail(
@@ -187,7 +181,11 @@ function parseUsage(value: unknown, taskId: string): SubagentUsageReport {
     );
   const usage = value['usage'];
   if (!isRecord(usage))
-    fail('subagent result package observed usage must be an object', 'child_result_invalid', taskId);
+    fail(
+      'subagent result package observed usage must be an object',
+      'child_result_invalid',
+      taskId,
+    );
   const cost = usage['cost'];
   if (!isRecord(cost))
     fail(
@@ -224,10 +222,7 @@ function parseUsage(value: unknown, taskId: string): SubagentUsageReport {
   };
 }
 
-function parseAttestations(
-  value: unknown,
-  taskId: string,
-): readonly SubagentRouteAttestation[] {
+function parseAttestations(value: unknown, taskId: string): readonly SubagentRouteAttestation[] {
   if (!Array.isArray(value))
     fail(
       'subagent result package route_attestations must be an array',
@@ -340,7 +335,11 @@ export function verifySubagentResultPackage(
 
   const routeRecord = parsed['route'];
   if (!isRecord(routeRecord))
-    fail('subagent result package route must be an object', 'child_result_invalid', expected.taskId);
+    fail(
+      'subagent result package route must be an object',
+      'child_result_invalid',
+      expected.taskId,
+    );
   const provider = requireString(routeRecord, 'provider', expected.taskId);
   const model = requireString(routeRecord, 'model', expected.taskId);
   if (provider !== expected.route.provider || model !== expected.route.model)
@@ -364,7 +363,11 @@ export function verifySubagentResultPackage(
 
   const answerRecord = parsed['answer'];
   if (!isRecord(answerRecord))
-    fail('subagent result package answer must be an object', 'child_result_invalid', expected.taskId);
+    fail(
+      'subagent result package answer must be an object',
+      'child_result_invalid',
+      expected.taskId,
+    );
   if (answerRecord['encoding'] !== 'utf-8')
     fail(
       'subagent result package answer encoding must be utf-8',

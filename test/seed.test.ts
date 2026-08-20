@@ -77,8 +77,8 @@ const baseEntries: readonly SessionEntry[] = [
 describe('subagent seed construction', () => {
   it('freezes the projected conversation and the authoritative directive', () => {
     const built = buildSubagentSeed(parentContext(baseEntries), {
-      taskId: taskIdHex("a"),
-      launchNonce: nonceHex("n"),
+      taskId: taskIdHex('a'),
+      launchNonce: nonceHex('n'),
       toolCallId: 'call-1',
       directive: 'find the root cause of the incident',
       capability: 'inspect',
@@ -120,8 +120,8 @@ describe('subagent seed construction', () => {
       assistantEntryWithToolCalls('e4', 'e3', ['call-1', 'call-2']),
     ];
     const built = buildSubagentSeed(parentContext(withCall), {
-      taskId: taskIdHex("a"),
-      launchNonce: nonceHex("n"),
+      taskId: taskIdHex('a'),
+      launchNonce: nonceHex('n'),
       toolCallId: 'call-1',
       directive: 'directive',
       capability: 'inspect',
@@ -136,8 +136,8 @@ describe('subagent seed construction', () => {
     expect(built.seed.conversation_projection.branch_filter.tool_call_id).toBe('call-1');
     expect(built.serialized).not.toContain('launching the subagents now');
     const sibling = buildSubagentSeed(parentContext(withCall), {
-      taskId: taskIdHex("b"),
-      launchNonce: nonceHex("m"),
+      taskId: taskIdHex('b'),
+      launchNonce: nonceHex('m'),
       toolCallId: 'call-2',
       directive: 'sibling directive',
       capability: 'inspect',
@@ -155,8 +155,8 @@ describe('subagent seed construction', () => {
     let failure: unknown;
     try {
       buildSubagentSeed(parentContext(baseEntries), {
-        taskId: taskIdHex("a"),
-        launchNonce: nonceHex("n"),
+        taskId: taskIdHex('a'),
+        launchNonce: nonceHex('n'),
         toolCallId: 'call-1',
         directive: '   ',
         capability: 'inspect',
@@ -174,8 +174,8 @@ describe('subagent seed construction', () => {
 
 describe('subagent seed verification (child side)', () => {
   const built = buildSubagentSeed(parentContext(baseEntries), {
-    taskId: taskIdHex("a"),
-    launchNonce: nonceHex("n"),
+    taskId: taskIdHex('a'),
+    launchNonce: nonceHex('n'),
     toolCallId: 'call-1',
     directive: 'the directive',
     capability: 'inspect',
@@ -226,7 +226,7 @@ describe('subagent seed verification (child side)', () => {
       try {
         verifySubagentSeedBytes(built.serialized, {
           sha256: built.sha256,
-          taskId: taskIdHex("z"),
+          taskId: taskIdHex('z'),
           launchNonce: built.seed.launch_nonce,
         });
       } catch (error) {

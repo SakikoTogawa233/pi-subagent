@@ -30,9 +30,7 @@ function buildPackage(answerBlocks: readonly string[], route = expectation.route
     seedSha256: expectation.seedSha256,
     directiveSha256: 'd'.repeat(64),
     route,
-    routeAttestations: [
-      { provider: route.provider, model: route.model, stop_reason: 'stop' },
-    ],
+    routeAttestations: [{ provider: route.provider, model: route.model, stop_reason: 'stop' }],
     stopReason: 'stop',
     turns: 3,
     toolCalls: 5,
@@ -86,12 +84,20 @@ describe('subagent result package', () => {
     const pkg = buildPackage(['answer']);
     const serialized = serializeSubagentResultPackage(pkg);
     expectTypedFailure(
-      () => verifySubagentResultPackage(serialized.replace(expectation.launchNonce, 'x'.repeat(32)), expectation),
+      () =>
+        verifySubagentResultPackage(
+          serialized.replace(expectation.launchNonce, 'x'.repeat(32)),
+          expectation,
+        ),
       'child_result_invalid',
       'wrong nonce',
     );
     expectTypedFailure(
-      () => verifySubagentResultPackage(serialized.replace(expectation.seedSha256, 'e'.repeat(64)), expectation),
+      () =>
+        verifySubagentResultPackage(
+          serialized.replace(expectation.seedSha256, 'e'.repeat(64)),
+          expectation,
+        ),
       'seed_hash_mismatch',
       'wrong seed hash',
     );
@@ -100,8 +106,7 @@ describe('subagent result package', () => {
   it('rejects route drift, missing attestations, and attestation mismatch', () => {
     const drifted = buildPackage(['answer'], { provider: 'someone-else', model: 'other' });
     expectTypedFailure(
-      () =>
-        verifySubagentResultPackage(serializeSubagentResultPackage(drifted), expectation),
+      () => verifySubagentResultPackage(serializeSubagentResultPackage(drifted), expectation),
       'route_mismatch',
       'drifted route',
     );
@@ -134,16 +139,14 @@ describe('subagent result package', () => {
     if (substitutedBlock === undefined) throw new Error('expected one answer block');
     substitutedBlock.data_base64 = Buffer.from('SUBSTITUTED', 'utf8').toString('base64');
     expectTypedFailure(
-      () =>
-        verifySubagentResultPackage(serializeSubagentResultPackage(substituted), expectation),
+      () => verifySubagentResultPackage(serializeSubagentResultPackage(substituted), expectation),
       'answer_hash_mismatch',
       'substituted block bytes',
     );
     const miscounted = buildPackage(['answer']);
     miscounted.answer.byte_length += 1;
     expectTypedFailure(
-      () =>
-        verifySubagentResultPackage(serializeSubagentResultPackage(miscounted), expectation),
+      () => verifySubagentResultPackage(serializeSubagentResultPackage(miscounted), expectation),
       'answer_hash_mismatch',
       'miscounted aggregate length',
     );
@@ -169,8 +172,7 @@ describe('subagent result package', () => {
     const incomplete = buildPackage(['answer']);
     incomplete.usage = { status: 'unavailable' } as never;
     expectTypedFailure(
-      () =>
-        verifySubagentResultPackage(serializeSubagentResultPackage(incomplete), expectation),
+      () => verifySubagentResultPackage(serializeSubagentResultPackage(incomplete), expectation),
       'child_result_invalid',
       'unavailable usage without reason',
     );
@@ -180,8 +182,7 @@ describe('subagent result package', () => {
       usage: { ...observedUsage, cost: { ...observedUsage.cost, total: -1 } },
     };
     expectTypedFailure(
-      () =>
-        verifySubagentResultPackage(serializeSubagentResultPackage(zeroCost), expectation),
+      () => verifySubagentResultPackage(serializeSubagentResultPackage(zeroCost), expectation),
       'child_result_invalid',
       'negative cost',
     );
@@ -220,8 +221,7 @@ describe('subagent result package', () => {
       },
     ];
     expectTypedFailure(
-      () =>
-        verifySubagentResultPackage(serializeSubagentResultPackage(badReceipt), expectation),
+      () => verifySubagentResultPackage(serializeSubagentResultPackage(badReceipt), expectation),
       'child_result_invalid',
       'invalid receipt hash',
     );
