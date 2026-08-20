@@ -38,8 +38,6 @@ import {
  * children and zero artifacts, which is a property the tests pin directly.
  */
 
-export const SUBAGENT_TASK_ID_PATTERN = /^s[0-9a-f]{32}$/;
-
 export function makeSubagentTaskId(): string {
   return `s${randomBytes(16).toString('hex')}`;
 }
