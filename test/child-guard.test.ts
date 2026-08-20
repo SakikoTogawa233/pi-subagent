@@ -1,23 +1,22 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, SessionEntry } from '@earendil-works/pi-coding-agent';
+import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
-  SUBAGENT_FINALIZATION_INPUT_RESERVE_TOKENS,
-  SUBAGENT_FINALIZATION_TRIGGER_TOKENS,
   evaluateSubagentRuntimeBudget,
   resolveSubagentLimits,
+  SUBAGENT_FINALIZATION_INPUT_RESERVE_TOKENS,
+  SUBAGENT_FINALIZATION_TRIGGER_TOKENS,
 } from '../extensions/budget.js';
-import { buildSubagentSeed } from '../extensions/seed.js';
-import type { SubagentPinnedRoute, SubagentSpillReceipt } from '../extensions/types.js';
 import { verifySubagentResultPackage } from '../extensions/result-package.js';
-import type { SessionEntry } from '@earendil-works/pi-coding-agent';
-import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
+import { buildSubagentSeed } from '../extensions/seed.js';
 import childExtension, {
   encodeSubagentToolResultContent,
   readSubagentUsage,
 } from '../extensions/subagent-child.js';
+import type { SubagentPinnedRoute, SubagentSpillReceipt } from '../extensions/types.js';
 
 const roots: string[] = [];
 
@@ -75,11 +74,13 @@ interface ChildHarness {
   pi: ExtensionAPI;
 }
 
-async function childHarness(overrides: {
-  capability?: 'inspect';
-  extensionMode?: 'isolated' | 'ambient';
-  limits?: Partial<ReturnType<typeof resolveSubagentLimits>>;
-} = {}): Promise<ChildHarness> {
+async function childHarness(
+  overrides: {
+    capability?: 'inspect';
+    extensionMode?: 'isolated' | 'ambient';
+    limits?: Partial<ReturnType<typeof resolveSubagentLimits>>;
+  } = {},
+): Promise<ChildHarness> {
   const root = await mkdtemp(join(tmpdir(), 'pi-subagent-child-'));
   roots.push(root);
   const artifactDirAbs = join(root, 'artifacts');
@@ -249,11 +250,16 @@ describe('subagent child guard', () => {
   it('spills oversized tool results and replaces them with hash-accounted receipts', async () => {
     const h = await childHarness();
     const bigPayload = 'x'.repeat(70_000);
-    const replacement = fireHook(h, 'tool_result', {
-      toolName: 'read',
-      toolCallId: 'call-big',
-      content: [{ type: 'text', text: bigPayload }],
-    }, undefined) as { content: Array<{ type: string; text: string }>; isError?: boolean };
+    const replacement = fireHook(
+      h,
+      'tool_result',
+      {
+        toolName: 'read',
+        toolCallId: 'call-big',
+        content: [{ type: 'text', text: bigPayload }],
+      },
+      undefined,
+    ) as { content: Array<{ type: string; text: string }>; isError?: boolean };
     const receiptText = replacement.content[0]?.text ?? '';
     expect(receiptText).toContain('subagent spill receipt');
     expect(receiptText).toContain('spill/');
@@ -270,16 +276,26 @@ describe('subagent child guard', () => {
     const h = await childHarness({ limits: { max_total_tool_output_bytes: 100_000 } });
     fireHook(h, 'turn_start', undefined, undefined);
     const huge = 'y'.repeat(65_536);
-    const first = fireHook(h, 'tool_result', {
-      toolName: 'read',
-      toolCallId: 'call-1',
-      content: [{ type: 'text', text: huge }],
-    }, undefined) as { isError?: boolean };
-    const second = fireHook(h, 'tool_result', {
-      toolName: 'read',
-      toolCallId: 'call-2',
-      content: [{ type: 'text', text: huge }],
-    }, undefined) as { content: Array<{ type: string; text: string }>; isError?: boolean };
+    const first = fireHook(
+      h,
+      'tool_result',
+      {
+        toolName: 'read',
+        toolCallId: 'call-1',
+        content: [{ type: 'text', text: huge }],
+      },
+      undefined,
+    ) as { isError?: boolean };
+    const second = fireHook(
+      h,
+      'tool_result',
+      {
+        toolName: 'read',
+        toolCallId: 'call-2',
+        content: [{ type: 'text', text: huge }],
+      },
+      undefined,
+    ) as { content: Array<{ type: string; text: string }>; isError?: boolean };
     expect(first.isError).toBeUndefined();
     expect(second.isError).toBe(true);
     expect(second.content[0]?.text).toContain('aggregate raw-output cap');
@@ -353,9 +369,9 @@ describe('subagent child helpers', () => {
     expect(multi.contentFormat).toBe('tool_result_content_json_v1');
     const parsed = JSON.parse(multi.payload.toString('utf8')) as Record<string, unknown>;
     expect(parsed['schema_version']).toBe('pi-subagent.tool-result-content.v1');
-    expect(() =>
-      encodeSubagentToolResultContent([{ type: 'weird' } as never]),
-    ).toThrow(/unsupported or malformed/);
+    expect(() => encodeSubagentToolResultContent([{ type: 'weird' } as never])).toThrow(
+      /unsupported or malformed/,
+    );
   });
 
   it('treats a partial usage record as no usage at all', () => {

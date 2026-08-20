@@ -194,7 +194,10 @@ export class SubagentBackgroundClient {
    * - a failure response: the service rejected the handshake.
    * - a success response with missing capabilities: incompatible version.
    */
-  static async connect(events: EventBus, options: ConnectOptions): Promise<SubagentBackgroundClient> {
+  static async connect(
+    events: EventBus,
+    options: ConnectOptions,
+  ): Promise<SubagentBackgroundClient> {
     const ownerId = `pi-subagent:${options.ownerTag}:${randomBytes(8).toString('hex')}`;
     const requestId = `sa-handshake-${randomBytes(8).toString('hex')}`;
     const responses: RawResponse[] = [];
@@ -381,7 +384,10 @@ export class SubagentBackgroundClient {
       sequence,
       text,
     });
-    return { task: requireTask(result['task']), nextSequence: requireNextSequence(result['next_sequence']) };
+    return {
+      task: requireTask(result['task']),
+      nextSequence: requireNextSequence(result['next_sequence']),
+    };
   }
 
   async update(
@@ -397,7 +403,10 @@ export class SubagentBackgroundClient {
     if (update.name !== undefined) payload['name'] = update.name;
     if (update.description !== undefined) payload['description'] = update.description;
     const result = await this.request('update', payload);
-    return { task: requireTask(result['task']), nextSequence: requireNextSequence(result['next_sequence']) };
+    return {
+      task: requireTask(result['task']),
+      nextSequence: requireNextSequence(result['next_sequence']),
+    };
   }
 
   async cancelAck(taskId: string, sequence: number, cancelId: string): Promise<SequencedOpResult> {
@@ -407,7 +416,10 @@ export class SubagentBackgroundClient {
       sequence,
       cancel_id: cancelId,
     });
-    return { task: requireTask(result['task']), nextSequence: requireNextSequence(result['next_sequence']) };
+    return {
+      task: requireTask(result['task']),
+      nextSequence: requireNextSequence(result['next_sequence']),
+    };
   }
 
   async settle(
@@ -423,7 +435,10 @@ export class SubagentBackgroundClient {
       status,
       ...(error === undefined ? {} : { error }),
     });
-    return { task: requireTask(result['task']), nextSequence: requireNextSequence(result['next_sequence']) };
+    return {
+      task: requireTask(result['task']),
+      nextSequence: requireNextSequence(result['next_sequence']),
+    };
   }
 
   async status(taskId: string): Promise<ExternalTaskSnapshot> {
@@ -467,7 +482,14 @@ export class SubagentBackgroundClient {
       ) {
         return;
       }
-      handler({ serviceId: this.serviceId, ownerId: this.ownerId, ownerRef, taskId, cancelId, reason });
+      handler({
+        serviceId: this.serviceId,
+        ownerId: this.ownerId,
+        ownerRef,
+        taskId,
+        cancelId,
+        reason,
+      });
     });
   }
 }

@@ -5,25 +5,25 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
 import {
-  SUBAGENT_REQUIRED_HOOK_GUARANTEES,
-  evaluateSubagentHookContract,
-  type SubagentHookContractEvidence,
-} from './hook-contract.js';
-import {
   assertSubagentAdmission,
   planSubagentAdmission,
   resolveSubagentLimits,
   type SubagentAdmissionPlanV1,
   type SubagentLimitOverrides,
 } from './budget.js';
-import { buildSubagentSeed, type BuiltSubagentSeed } from './seed.js';
+import {
+  evaluateSubagentHookContract,
+  SUBAGENT_REQUIRED_HOOK_GUARANTEES,
+  type SubagentHookContractEvidence,
+} from './hook-contract.js';
 import { SUBAGENT_FORBIDDEN_TOOLS } from './removed-surface.js';
+import { type BuiltSubagentSeed, buildSubagentSeed } from './seed.js';
 import {
   SUBAGENT_CAPABILITIES,
   SUBAGENT_INSPECT_TOOLS,
   SUBAGENT_RUN_TOOL_NAME,
-  SubagentError,
   type SubagentCapability,
+  SubagentError,
   type SubagentExtensionMode,
   type SubagentLimits,
   type SubagentPinnedRoute,
@@ -190,7 +190,9 @@ export function resolveSubagentAttributionExtensionPath(
   pathExists: (path: string) => boolean = existsSync,
 ): string {
   const modulePath = fileURLToPath(moduleUrl);
-  const extension = modulePath.endsWith('.ts') ? 'subagent-attribution.ts' : 'subagent-attribution.js';
+  const extension = modulePath.endsWith('.ts')
+    ? 'subagent-attribution.ts'
+    : 'subagent-attribution.js';
   const candidate = resolve(dirname(modulePath), extension);
   if (!pathExists(candidate)) {
     throw new SubagentError(`subagent attribution loader is missing: ${candidate}`, {
@@ -206,11 +208,14 @@ export function resolveSubagentAttributionExtensionPath(
 
 export function delegateToolsFor(capability: SubagentCapability): readonly string[] {
   if (capability === 'inspect') return SUBAGENT_INSPECT_TOOLS;
-  throw new SubagentError(`subagent_run capability ${capability} is not supported in this version`, {
-    code: 'subagent_isolation_unsupported',
-    childCreated: false,
-    remediation: [`Supported capabilities: ${SUBAGENT_CAPABILITIES.join(', ')}.`],
-  });
+  throw new SubagentError(
+    `subagent_run capability ${capability} is not supported in this version`,
+    {
+      code: 'subagent_isolation_unsupported',
+      childCreated: false,
+      remediation: [`Supported capabilities: ${SUBAGENT_CAPABILITIES.join(', ')}.`],
+    },
+  );
 }
 
 function assertSubagentExtensionMode(mode: SubagentExtensionMode): void {

@@ -1,21 +1,35 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { mkdirSync, openSync, closeSync, fsyncSync, renameSync, writeSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
-import { Type, type Static } from 'typebox';
-import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import type { Usage } from '@earendil-works/pi-ai';
 import {
+  closeSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  writeSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import type { Usage } from '@earendil-works/pi-ai';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { utf8ByteClassBreakdown } from '@sakiko233/pi-agent-runtime';
+import { type Static, Type } from 'typebox';
+import { subagentSpillArtifactPath } from './artifacts.js';
+import {
+  evaluateSubagentRuntimeBudget,
   SUBAGENT_FINALIZATION_INPUT_RESERVE_TOKENS,
   SUBAGENT_FINALIZATION_TRIGGER_TOKENS,
-  evaluateSubagentRuntimeBudget,
 } from './budget.js';
-import { utf8ByteClassBreakdown } from '@sakiko233/pi-agent-runtime';
 import {
+  assertWellFormedUtf8,
+  buildSubagentResultPackage,
+  serializeSubagentResultPackage,
+} from './result-package.js';
+import { verifySubagentSeedBytes } from './seed.js';
+import {
+  SUBAGENT_CAPABILITIES,
   SUBAGENT_CHILD_ARTIFACT_READER_TOOL,
   SUBAGENT_CHILD_TERMINAL_SCHEMA_VERSION,
   SUBAGENT_RECEIPT_SCHEMA_VERSION,
-  SUBAGENT_CAPABILITIES,
   SUBAGENT_RUNTIME_BUDGET_SCHEMA_VERSION,
   SUBAGENT_TOOL_RESULT_CONTENT_SCHEMA_VERSION,
   type SubagentRouteAttestation,
@@ -23,13 +37,6 @@ import {
   type SubagentSpillReceipt,
   type SubagentUsageReport,
 } from './types.js';
-import { verifySubagentSeedBytes } from './seed.js';
-import { subagentSpillArtifactPath } from './artifacts.js';
-import {
-  assertWellFormedUtf8,
-  buildSubagentResultPackage,
-  serializeSubagentResultPackage,
-} from './result-package.js';
 
 /**
  * Package-owned subagent child extension.
@@ -131,9 +138,7 @@ function sha256(value: Buffer): string {
  * suppression. The head message is retained only when it is a user message, so
  * a suppressed request cannot carry assistant or tool content forward.
  */
-function suppressedMessages<TMessage extends object>(
-  messages: readonly TMessage[],
-): TMessage[] {
+function suppressedMessages<TMessage extends object>(messages: readonly TMessage[]): TMessage[] {
   const head = messages[0];
   if (head === undefined) return [];
   return Reflect.get(head, 'role') === 'user' ? [head] : [];
@@ -157,9 +162,10 @@ interface SubagentToolImagePart {
 type SubagentToolResultPart = SubagentToolTextPart | SubagentToolImagePart;
 type SpillContentFormat = SubagentSpillReceipt['content_format'];
 
-export function encodeSubagentToolResultContent(
-  content: ReadonlyArray<SubagentToolResultPart>,
-): { payload: Buffer; contentFormat: Exclude<SpillContentFormat, undefined> } {
+export function encodeSubagentToolResultContent(content: ReadonlyArray<SubagentToolResultPart>): {
+  payload: Buffer;
+  contentFormat: Exclude<SpillContentFormat, undefined>;
+} {
   if (content.length === 1) {
     const only = content[0];
     if (only?.type === 'text') {
@@ -288,7 +294,9 @@ function readEnv(key: string): string {
 
 function pathInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.split(sep).includes('..'));
+  return (
+    rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.split(sep).includes('..'))
+  );
 }
 
 /** Synchronous durable commit: temp write, fsync, rename, directory fsync. */
@@ -900,7 +908,10 @@ export default function subagentChildExtension(pi: ExtensionAPI): void {
   pi.on('turn_start', () => {
     state.turns += 1;
     if (state.turns > seed.limits.max_turns) {
-      latch('child_turn_limit', `subagent child exceeded its ${String(seed.limits.max_turns)} turn limit`);
+      latch(
+        'child_turn_limit',
+        `subagent child exceeded its ${String(seed.limits.max_turns)} turn limit`,
+      );
     }
   });
 
@@ -976,7 +987,10 @@ export default function subagentChildExtension(pi: ExtensionAPI): void {
     // parent sees a typed reason instead of an empty directory.
     if (state.committed) return;
     if (state.terminal === undefined) {
-      latch('child_exited_without_commit', 'the subagent child shut down before committing a result');
+      latch(
+        'child_exited_without_commit',
+        'the subagent child shut down before committing a result',
+      );
     }
     if (state.terminal !== undefined) writeTerminalRecord(state.terminal);
   });

@@ -8,7 +8,7 @@ import {
 import { SubagentError } from '../extensions/types.js';
 
 const expectation = {
-  taskId: 's' + 'a'.repeat(32),
+  taskId: `s${'a'.repeat(32)}`,
   launchNonce: 'n'.repeat(32),
   seedSha256: 'f'.repeat(64),
   route: { provider: 'test-provider', model: 'test-model' },

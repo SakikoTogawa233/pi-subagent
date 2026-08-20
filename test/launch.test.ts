@@ -1,7 +1,14 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { SessionEntry } from '@earendil-works/pi-coding-agent';
+import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
 import { afterAll, describe, expect, it } from 'vitest';
+import {
+  loadSubagentHookContractEvidence,
+  type SubagentHookContractEvidence,
+} from '../extensions/hook-contract.js';
 import {
   assertSubagentHookContract,
   buildSubagentChildArgv,
@@ -16,24 +23,15 @@ import {
   resolveSubagentAttributionExtensionPath,
   resolveSubagentChildExtensionPath,
   resolveSubagentRoute,
-  subagentChildEnv,
   SUBAGENT_REMOVED_ENV_KEYS,
+  subagentChildEnv,
 } from '../extensions/launch.js';
-import {
-  loadSubagentHookContractEvidence,
-  type SubagentHookContractEvidence,
-} from '../extensions/hook-contract.js';
+import { SUBAGENT_FORBIDDEN_TOOLS } from '../extensions/removed-surface.js';
 import {
   SUBAGENT_INSPECT_TOOLS,
   SubagentError,
   type SubagentPinnedRoute,
 } from '../extensions/types.js';
-import { SUBAGENT_FORBIDDEN_TOOLS } from '../extensions/removed-surface.js';
-import type { ParentContextSource } from '@sakiko233/pi-agent-runtime';
-import type { SessionEntry } from '@earendil-works/pi-coding-agent';
-import { resolveSubagentLimits } from '../extensions/budget.js';
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 
 const roots: string[] = [];
 
@@ -242,9 +240,9 @@ describe('subagent child isolation surface', () => {
       childExtensionPath: '/pkg/extensions/subagent-child.ts',
       systemPrompt: 'child system prompt',
     });
-    expect(nonAnthropic.filter((_arg, index) => nonAnthropic[index - 1] === '--extension')).toEqual([
-      '/pkg/extensions/subagent-child.ts',
-    ]);
+    expect(nonAnthropic.filter((_arg, index) => nonAnthropic[index - 1] === '--extension')).toEqual(
+      ['/pkg/extensions/subagent-child.ts'],
+    );
   });
 
   it('strips parent session identity and installs subagent contract env vars', async () => {

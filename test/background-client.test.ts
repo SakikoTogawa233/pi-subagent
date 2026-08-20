@@ -1,16 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
 import type { EventBus } from '@earendil-works/pi-coding-agent';
+import { describe, expect, it } from 'vitest';
 import {
-  BackgroundServiceError,
   type CancelFrame,
+  type ExternalTaskSnapshot,
   SubagentBackgroundClient,
   V2_CANCEL_CHANNEL,
   V2_REQUEST_CHANNEL,
   V2_REQUEST_SCHEMA,
   V2_RESPONSE_CHANNEL,
   V2_RESPONSE_SCHEMA,
-  type ExternalTaskSnapshot,
 } from '../extensions/background-client.js';
 
 class MemoryEventBus implements EventBus {
@@ -115,16 +114,13 @@ class StubService {
   private execute(
     operation: string,
     payload: Record<string, unknown>,
-    requestId: string,
+    _requestId: string,
   ): Record<string, unknown> {
     if (operation === 'handshake') {
       this.assertClosed(payload, ['protocol_version', 'owner_id'], 'handshake');
       if (payload['protocol_version'] !== 2) throw new Error('protocol_version must be 2');
       const ownerId = String(payload['owner_id']);
-      if (
-        this.rejectOwnerPrefix !== undefined &&
-        ownerId.startsWith(this.rejectOwnerPrefix)
-      ) {
+      if (this.rejectOwnerPrefix !== undefined && ownerId.startsWith(this.rejectOwnerPrefix)) {
         throw new Error(`owner ${ownerId} already handshook`);
       }
       if (this.owners.has(ownerId)) throw new Error(`owner ${ownerId} already handshook`);
@@ -285,9 +281,8 @@ describe('subagent background client handshake', () => {
     const client = await connect(bus, 'owner-a');
     expect(client.serviceId).toBe(service.serviceId);
     expect(client.ownerId).toContain('owner-a');
-    const handshake = bus.delivered.find(
-      (entry) => entry.channel === V2_REQUEST_CHANNEL,
-    )?.data as Frame;
+    const handshake = bus.delivered.find((entry) => entry.channel === V2_REQUEST_CHANNEL)
+      ?.data as Frame;
     expect(handshake.operation).toBe('handshake');
     expect(handshake.payload?.['protocol_version']).toBe(2);
     expect(typeof handshake.payload?.['owner_id']).toBe('string');
@@ -348,7 +343,7 @@ describe('subagent background client operations', () => {
     const service = new StubService(bus);
     const client = await connect(bus);
     const registered = await client.register({
-      ownerRef: 's' + 'a'.repeat(32),
+      ownerRef: `s${'a'.repeat(32)}`,
       name: 'Investigate flake',
       description: 'subagent inspect run',
       cancellable: true,
@@ -376,7 +371,7 @@ describe('subagent background client operations', () => {
     new StubService(bus);
     const client = await connect(bus);
     const registered = await client.register({
-      ownerRef: 's' + 'a'.repeat(32),
+      ownerRef: `s${'a'.repeat(32)}`,
       name: 'task',
       cancellable: true,
       rerunnable: false,
@@ -402,7 +397,7 @@ describe('subagent background client operations', () => {
     const cancelFrames: CancelFrame[] = [];
     const off = client.onCancellation((frame) => cancelFrames.push(frame));
     const registered = await client.register({
-      ownerRef: 's' + 'b'.repeat(32),
+      ownerRef: `s${'b'.repeat(32)}`,
       name: 'cancellable task',
       cancellable: true,
       rerunnable: false,
@@ -432,14 +427,16 @@ describe('subagent background client operations', () => {
       requestTimeoutMs: 100,
     });
     service.close();
-    await expect(client.register({
-      ownerRef: 's' + 'c'.repeat(32),
-      name: 'task',
-      cancellable: true,
-      rerunnable: false,
-      notifyOnCompletion: true,
-      triggerOnCompletion: true,
-    })).rejects.toMatchObject({
+    await expect(
+      client.register({
+        ownerRef: `s${'c'.repeat(32)}`,
+        name: 'task',
+        cancellable: true,
+        rerunnable: false,
+        notifyOnCompletion: true,
+        triggerOnCompletion: true,
+      }),
+    ).rejects.toMatchObject({
       name: 'BackgroundServiceError',
       code: 'request_timeout',
     });
