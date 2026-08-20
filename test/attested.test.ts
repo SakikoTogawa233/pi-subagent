@@ -24,6 +24,7 @@ vi.mock('@sakiko233/pi-agent-runtime', async (importActual) => {
     },
   };
 });
+
 import {
   buildSubagentAttestedArgv,
   buildSubagentPiAttestation,

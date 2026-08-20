@@ -214,9 +214,7 @@ describe('subagent child guard', () => {
       offset: 0,
       length: 9,
     })) as { content: Array<{ type: string; text: string }> };
-    expect(result.content[0]?.text).toContain(
-      Buffer.from('contained', 'utf8').toString('base64'),
-    );
+    expect(result.content[0]?.text).toContain(Buffer.from('contained', 'utf8').toString('base64'));
     expect(() =>
       tool.execute('call-r2', { artifact: join('..', 'escape.bin'), offset: 0, length: 1 }),
     ).toThrow(/escapes the subagent artifact directory/);
