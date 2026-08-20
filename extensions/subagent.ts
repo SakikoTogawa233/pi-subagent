@@ -729,7 +729,6 @@ function registerSubagentTools(
       }
 
       const usageDelivered = verified.package.usage.status === 'observed' && !record.usageDelivered;
-      if (usageDelivered) record.usageDelivered = true;
 
       const details: SubagentResultViewDetails = {
         schema_version: SUBAGENT_RESULT_VIEW_SCHEMA_VERSION,
@@ -757,20 +756,23 @@ function registerSubagentTools(
           ? 'Usage: attached to this retrieval exactly once.'
           : 'Usage: already attached by an earlier retrieval, or unavailable; not counted again.',
       ].join('\n');
-      if (decision.mode === 'artifact') {
-        return {
-          content: textContent(
-            `${header}\nDelivery: artifact (${decision.reason}). The complete verified answer is in ${record.facts.artifactDir}/result.json. It was not truncated.`,
-          ),
-          details,
-        };
-      }
       const result: {
         content: ReturnType<typeof textContent>;
         details: SubagentResultViewDetails;
         usage?: Usage;
-      } = { content: textContent(`${header}\n\n${verified.answer}`), details };
+      } =
+        decision.mode === 'artifact'
+          ? {
+              content: textContent(
+                `${header}\nDelivery: artifact (${decision.reason}). The complete verified answer is in ${record.facts.artifactDir}/result.json. It was not truncated.`,
+              ),
+              details,
+            }
+          : { content: textContent(`${header}\n\n${verified.answer}`), details };
+      // The latch is consumed only here, where usage is actually attached to
+      // the returned result, so no delivery mode can lose it silently.
       if (usageDelivered && verified.package.usage.status === 'observed') {
+        record.usageDelivered = true;
         result.usage = verified.package.usage.usage;
       }
       return result;
