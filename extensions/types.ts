@@ -28,6 +28,8 @@ export const SUBAGENT_BUDGET_PLAN_SCHEMA_VERSION = 'pi-subagent.budget-plan.v3' 
 export const SUBAGENT_MANIFEST_SCHEMA_VERSION = 'pi-subagent.manifest.v2' as const;
 export const SUBAGENT_OUTCOME_SCHEMA_VERSION = 'pi-subagent.outcome.v1' as const;
 export const SUBAGENT_LAUNCH_DETAILS_SCHEMA_VERSION = 'pi-subagent.launch.v1' as const;
+export const SUBAGENT_ATTESTED_LAUNCH_DETAILS_SCHEMA_VERSION =
+  'pi-subagent.attested-launch.v1' as const;
 export const SUBAGENT_RESULT_VIEW_SCHEMA_VERSION = 'pi-subagent.result-view.v1' as const;
 export const SUBAGENT_CHILD_TERMINAL_SCHEMA_VERSION = 'pi-subagent.child-terminal.v1' as const;
 export const SUBAGENT_RUNTIME_BUDGET_SCHEMA_VERSION = 'pi-subagent.runtime-budget.v1' as const;

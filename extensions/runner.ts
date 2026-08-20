@@ -10,7 +10,7 @@ import {
   resolvePiLaunch,
 } from '@sakiko233/pi-agent-runtime';
 import { discardSubagentArtifactRoot, SubagentArtifactStore } from './artifacts.js';
-import type { SubagentBackgroundClient } from './background-client.js';
+import type { ExternalTaskSnapshot, SubagentBackgroundClient } from './background-client.js';
 import { SUBAGENT_INLINE_ANSWER_BYTES } from './budget.js';
 import {
   buildSubagentChildArgv,
@@ -400,6 +400,8 @@ export interface SubagentRunRecord {
   readonly facts: SubagentRunFacts;
   /** Service-allocated registry task id; distinct from the subagent task id. */
   readonly serviceTaskId: string;
+  /** The register-time service snapshot, for receipts. */
+  readonly serviceTask: ExternalTaskSnapshot;
   state: SubagentRunState;
   error?: string | undefined;
   outcome?: SubagentRunOutcome | undefined;
@@ -568,6 +570,7 @@ export class SubagentRunSupervisor {
     const record: SubagentRunRecord = {
       facts: prepared.facts,
       serviceTaskId: registered.task.id,
+      serviceTask: registered.task,
       state: 'running',
       usageDelivered: false,
     };
