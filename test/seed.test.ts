@@ -96,7 +96,7 @@ describe('subagent seed construction', () => {
     expect(built.serialized).not.toContain('"toolCall"');
     expect(built.ledger.schema_version).toBe('pi-subagent.ledger.v1');
     expect(built.ledger.root_sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(built.sha256).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(built.sha256).toMatch(/^[0-9a-f]{64}$/);
     const parsed = JSON.parse(built.serialized);
     expect(Object.keys(parsed).sort()).toEqual([
       'capability',

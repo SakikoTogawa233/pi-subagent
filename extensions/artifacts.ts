@@ -445,7 +445,7 @@ export class SubagentArtifactStore {
     const ref: SubagentArtifactRef = {
       path: basename(absPath),
       byte_length: bytes.length,
-      sha256: `sha256:${sha256Bytes(bytes)}`,
+      sha256: sha256Bytes(bytes),
     };
     await this.update((manifest) => {
       manifest.artifacts = { ...manifest.artifacts, [name]: ref };

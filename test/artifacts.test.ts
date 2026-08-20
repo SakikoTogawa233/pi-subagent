@@ -81,7 +81,7 @@ describe('subagent artifact store', () => {
     const cwd = await freshCwd();
     const store = await createStore(cwd);
     const seedRef = await store.writeSeed('{"seed":true}');
-    expect(seedRef.sha256).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(seedRef.sha256).toMatch(/^[0-9a-f]{64}$/);
     await store.writeLedger({ schema_version: 'pi-subagent.ledger.v1' });
     await store.writeBudgetPlan(plan);
     await store.writeChildPrompt(Buffer.from('child prompt', 'utf8'));

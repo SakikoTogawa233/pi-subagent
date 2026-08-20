@@ -1,10 +1,10 @@
+import { createHash } from 'node:crypto';
 import {
   canonicalJson,
   type ParentContextSource,
   type ParentSnapshotOptions,
   type ProjectedConversationV2,
   projectVisibleConversation,
-  sha256Text,
   snapshotParentConversation,
   UnsupportedConversationBlockError,
 } from '@sakiko233/pi-agent-runtime';
@@ -35,6 +35,10 @@ import {
  * another child-agent consumer's artifact: the policy id, ledger schema, and
  * branch filter all carry subagent ownership.
  */
+
+function sha256Text(value: string): string {
+  return createHash('sha256').update(Buffer.from(value, 'utf8')).digest('hex');
+}
 
 export interface BuildSubagentSeedOptions {
   taskId: string;
