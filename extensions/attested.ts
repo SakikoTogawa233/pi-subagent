@@ -749,20 +749,7 @@ export class SubagentAttestedSupervisor {
       terminal,
       resolveTerminal,
     };
-    this.controls.set(id, control);
-    this.byServiceTaskId.set(registered.task.id, control);
-
     const startTimeMs = Date.now();
-    await mkdir(attestedDirAbs, { recursive: true, mode: 0o700 });
-    await writeFileDurable(paths.outputAbsPath, '');
-    await writeFileDurable(paths.eventsAbsPath, '');
-    await writeFileDurable(paths.stderrAbsPath, '');
-    await writeFileDurable(
-      paths.wrapperAbsPath,
-      'direct-spawn attested Pi task; no shell telemetry wrapper is used\n',
-    );
-    await this.writeMetadata(paths, record, 'running', startTimeMs, null, null, 0);
-
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
     let startupError: string | undefined;
@@ -770,9 +757,17 @@ export class SubagentAttestedSupervisor {
     let closeObserved: { code: number | null; signal: NodeJS.Signals | null } | undefined;
     let timeoutHandle: NodeJS.Timeout | undefined;
     let escalationHandle: NodeJS.Timeout | undefined;
+    let child: import('./runner.js').SubagentChildProcess | undefined;
+    let killRequestedBeforeSpawn = false;
 
     const killChild = (): void => {
       if (closeObserved !== undefined) return;
+      if (child === undefined) {
+        // A kill request that lands before the child exists aborts the spawn:
+        // the run settles as killed and no orphan is ever created.
+        killRequestedBeforeSpawn = true;
+        return;
+      }
       if (this.platform === 'win32') {
         child.kill('SIGTERM');
         return;
@@ -797,12 +792,58 @@ export class SubagentAttestedSupervisor {
         }
       }, this.killGraceMs);
     };
+    // The kill control is wired before registration is published, so a cancel
+    // frame or shutdown arriving at any point after publication always has a
+    // live kill path.
     control.kill = () => {
       killKind ??= 'shutdown';
       killChild();
     };
+    this.controls.set(id, control);
+    this.byServiceTaskId.set(registered.task.id, control);
 
-    const child = this.spawnImpl(launch.executable, piLaunchArgv(launch, argv.slice(1)), {
+    await mkdir(attestedDirAbs, { recursive: true, mode: 0o700 });
+    await writeFileDurable(paths.outputAbsPath, '');
+    await writeFileDurable(paths.eventsAbsPath, '');
+    await writeFileDurable(paths.stderrAbsPath, '');
+    await writeFileDurable(
+      paths.wrapperAbsPath,
+      'direct-spawn attested Pi task; no shell telemetry wrapper is used\n',
+    );
+    await this.writeMetadata(paths, record, 'running', startTimeMs, null, null, 0);
+
+    if (killRequestedBeforeSpawn) {
+      // The kill request arrived during evidence setup. Settle as killed with
+      // empty raw capture; no child was ever spawned.
+      this.enqueue(control, async () => {
+        try {
+          await this.finalize(control, {
+            request: input.request,
+            cwd: input.cwd,
+            argv,
+            paths,
+            promptBytes,
+            reportAbsPath,
+            auth,
+            repoRootRealpath,
+            cwdRealpath,
+            startAuthority,
+            startTimeMs,
+            stdoutChunks,
+            stderrChunks,
+            startupError,
+            killKind: control.cancelId !== undefined ? 'user' : (killKind ?? 'shutdown'),
+            close: { code: null, signal: null },
+          });
+        } finally {
+          control.settled = true;
+          control.resolveTerminal(control.record);
+        }
+      });
+      return record;
+    }
+
+    child = this.spawnImpl(launch.executable, piLaunchArgv(launch, argv.slice(1)), {
       cwd: input.cwd,
       detached: this.platform !== 'win32',
       shell: false,
