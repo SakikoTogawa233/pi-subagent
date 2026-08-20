@@ -1,0 +1,69 @@
+{
+  "name": "@sakiko233/pi-subagent",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Pi extension for one inspect-only background subagent with a frozen conversation seed, verified result retrieval, and attested single-child Pi runs, built on the shared pi-background-tasks task service.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "subagent",
+    "delegation",
+    "background",
+    "attestation"
+  ],
+  "license": "MIT",
+  "author": "SakikoTogawa233",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SakikoTogawa233/pi-subagent.git"
+  },
+  "homepage": "https://github.com/SakikoTogawa233/pi-subagent#readme",
+  "bugs": {
+    "url": "https://github.com/SakikoTogawa233/pi-subagent/issues"
+  },
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/subagent.ts"
+    ]
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "biome check .",
+    "pack:check": "node scripts/check-package-payload.mjs",
+    "setup:runtime": "node scripts/install-runtime-tarball.mjs"
+  },
+  "dependencies": {
+    "@sakiko233/pi-agent-runtime": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "^0.84.2",
+    "@earendil-works/pi-coding-agent": "^0.84.2",
+    "@earendil-works/pi-tui": "^0.84.2",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.5",
+    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-tui": "0.84.2",
+    "@types/node": "24.3.0",
+    "typebox": "1.3.7",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
