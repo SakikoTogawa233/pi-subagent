@@ -51,25 +51,7 @@ async function packRepairedSubagent(root: string): Promise<string> {
   const entry = (JSON.parse(output) as PackEntry[])[0];
   if (entry === undefined) throw new Error('npm pack returned no package entry');
   packedSubagent = join(root, entry.filename);
-
-  const staged = join(root, 'repaired-release');
-  await mkdir(staged);
-  execFileSync('tar', ['-xzf', packedSubagent, '-C', staged]);
-  const manifestPath = join(staged, 'package', 'package.json');
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-  manifest.version = '0.1.1';
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  const stagedOutput = execFileSync(
-    'npm',
-    ['pack', '--json', '--pack-destination', root, join(staged, 'package')],
-    {
-      encoding: 'utf8',
-      env: { ...process.env, npm_config_loglevel: 'silent' },
-    },
-  );
-  const stagedEntry = (JSON.parse(stagedOutput) as PackEntry[])[0];
-  if (stagedEntry === undefined) throw new Error('staged npm pack returned no package entry');
-  return join(root, stagedEntry.filename);
+  return packedSubagent;
 }
 
 async function startRegistry(configPath: string): Promise<void> {
@@ -266,6 +248,7 @@ describe.sequential('fixed transitive runtime installation', () => {
         encoding: 'utf8',
       }),
     );
+    expect(manifest.version).toBe('0.1.1');
     expect(manifest.dependencies['@sakiko233/pi-agent-runtime']).toBe('^0.1.1');
     expect(manifest.pi).toEqual({ extensions: ['./extensions/subagent.ts'] });
     const listing = execFileSync('tar', ['-tzf', packedSubagent], { encoding: 'utf8' });

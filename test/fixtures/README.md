@@ -11,5 +11,5 @@ installation topology without depending on the live registry during the regressi
 | `@sakiko233/pi-subagent` | 0.1.0 | `f6bb0cd35e2db81914bf61dfc52b48267acc24ea14bb8b1eb8c70ecaef252e98dc9c93478075a363482d1db34d50727f2ce8be03cc00eb0df5b8d5478ed55fc8` |
 
 The local fixture registry serves these immutable tarballs through normal npm metadata endpoints.
-The repaired consumer tarball is packed from the working tree and staged at the future patch version
-inside a temporary directory; the repository version is never changed by the test.
+The repaired 0.1.1 consumer tarball is packed directly from the release-prepared working tree. The
+published 0.1.0 consumer tarball remains immutable historical input for the stale-lock reproduction.
