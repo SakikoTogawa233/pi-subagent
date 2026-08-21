@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
  * E404 on the runtime dependency. This script is the entry point for fresh
  * checkouts: it packs the sibling repository exactly the way the runtime's own
  * synthetic-consumer tests do, then installs the full dependency tree with the
- * tarball satisfying the manifest's published `^0.1.0` range (`--no-save` keeps
+ * tarball satisfying the manifest's published `^0.1.1` range (`--no-save` keeps
  * package.json on the published range).
  */
 

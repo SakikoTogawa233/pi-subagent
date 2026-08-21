@@ -49,7 +49,7 @@
     "setup:runtime": "node scripts/install-runtime-tarball.mjs"
   },
   "dependencies": {
-    "@sakiko233/pi-agent-runtime": "^0.1.0"
+    "@sakiko233/pi-agent-runtime": "^0.1.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "^0.84.2",

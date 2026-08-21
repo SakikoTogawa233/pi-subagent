@@ -39,8 +39,8 @@ for (const host of Object.keys(manifest.peerDependencies ?? {})) {
     throw new Error(`host package ${host} must stay a peer, never a dependency`);
   }
 }
-if (manifest.dependencies?.['@sakiko233/pi-agent-runtime'] === undefined) {
-  throw new Error('the runtime dependency is required');
+if (manifest.dependencies?.['@sakiko233/pi-agent-runtime'] !== '^0.1.1') {
+  throw new Error('the runtime dependency must exclude 0.1.0 and require the fixed 0.1.1 floor');
 }
 
 // --- pack both packages --------------------------------------------------------

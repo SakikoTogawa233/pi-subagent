@@ -1,4 +1,9 @@
-import { type ChildProcessWithoutNullStreams, execFileSync, spawn } from 'node:child_process';
+import {
+  type ChildProcessWithoutNullStreams,
+  execFileSync,
+  spawn,
+  spawnSync,
+} from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -116,18 +121,32 @@ function piInstall(agentDir: string, source: string): string {
   });
 }
 
+function smokeEnvironment(agentDir: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_BG_DISABLE_UPDATE_CHECK: '1',
+    PI_SKIP_VERSION_CHECK: '1',
+    PI_TELEMETRY: '0',
+  };
+}
+
 function smoke(agentDir: string, mode: 'load' | 'start'): string {
   return execFileSync(process.execPath, [smokeScript, agentDir, mode], {
     cwd: repoRoot,
     encoding: 'utf8',
-    env: {
-      ...process.env,
-      PI_CODING_AGENT_DIR: agentDir,
-      PI_BG_DISABLE_UPDATE_CHECK: '1',
-      PI_SKIP_VERSION_CHECK: '1',
-      PI_TELEMETRY: '0',
-    },
+    env: smokeEnvironment(agentDir),
   });
+}
+
+function failedLoaderSmoke(agentDir: string): string {
+  const result = spawnSync(process.execPath, [smokeScript, agentDir, 'load'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: smokeEnvironment(agentDir),
+  });
+  expect(result.status).not.toBe(0);
+  return `${result.stdout}${result.stderr}`;
 }
 
 async function assertTwoPackageTopology(agentDir: string, runtimeVersion: string): Promise<void> {
@@ -210,13 +229,7 @@ describe.sequential('fixed transitive runtime installation', () => {
     piInstall(agentDir, 'npm:@sakiko233/pi-subagent');
     await assertTwoPackageTopology(agentDir, '0.1.0');
 
-    let historicalFailure = '';
-    try {
-      smoke(agentDir, 'load');
-    } catch (error) {
-      const commandError = error as { message: string; stderr?: string };
-      historicalFailure = `${commandError.message}\n${commandError.stderr ?? ''}`;
-    }
+    const historicalFailure = failedLoaderSmoke(agentDir);
     expect(historicalFailure).toContain('dist/compat.js/api/constrained-sampling');
     expect(historicalFailure).toContain(
       'node_modules/@sakiko233/pi-agent-runtime/dist/anthropic-attribution.js',
