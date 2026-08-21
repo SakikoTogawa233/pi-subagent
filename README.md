@@ -17,11 +17,13 @@ owned by the shared task service; this package is an owner client of it.
 ## Install
 
 ```bash
-npm install @sakiko233/pi-background-tasks @sakiko233/pi-subagent
+pi install npm:@sakiko233/pi-background-tasks
+pi install npm:@sakiko233/pi-subagent
 ```
 
-and enable both packages in your Pi configuration. Order does not matter; the
-handshake happens at session start.
+Those are the only two Pi packages to install and enable. `pi-agent-runtime` is an ordinary
+transitive npm dependency of pi-subagent; do not add it to Pi package settings. Order does not
+matter, and the background-service handshake happens at session start.
 
 ## Tools
 
