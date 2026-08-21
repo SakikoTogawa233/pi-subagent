@@ -242,13 +242,17 @@ describe.sequential('fixed transitive runtime installation', () => {
     );
   }, 120_000);
 
-  it('packs a manifest that excludes runtime 0.1.0 and bundles no runtime Pi resource', () => {
+  it('packs a manifest that excludes runtime 0.1.0 and bundles no runtime Pi resource', async () => {
     const manifest = JSON.parse(
       execFileSync('tar', ['-xOf', packedSubagent, 'package/package.json'], {
         encoding: 'utf8',
       }),
     );
-    expect(manifest.version).toBe('0.1.1');
+    // The packed manifest must mirror this repository's manifest verbatim;
+    // the version moves with every release, so pin to the source of truth
+    // instead of a literal that breaks each subsequent bump.
+    const repoManifest = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8'));
+    expect(manifest.version).toBe(repoManifest.version);
     expect(manifest.dependencies['@sakiko233/pi-agent-runtime']).toBe('^0.1.1');
     expect(manifest.pi).toEqual({ extensions: ['./extensions/subagent.ts'] });
     const listing = execFileSync('tar', ['-tzf', packedSubagent], { encoding: 'utf8' });

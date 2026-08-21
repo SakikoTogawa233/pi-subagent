@@ -17,6 +17,9 @@ import {
 } from '@sakiko233/pi-agent-runtime';
 import {
   SUBAGENT_BUDGET_PLAN_SCHEMA_VERSION,
+  SUBAGENT_DEFAULT_MAX_TOOL_CALLS,
+  SUBAGENT_DEFAULT_MAX_TURNS,
+  SUBAGENT_DEFAULT_TIMEOUT_SECONDS,
   SubagentError,
   type SubagentLimits,
   type SubagentPinnedRoute,
@@ -52,9 +55,14 @@ export const SUBAGENT_MIN_CONTEXT_WINDOW_TOKENS =
   SUBAGENT_FRAMING_RESERVE_TOKENS +
   SUBAGENT_SAFETY_RESERVE_TOKENS;
 
-export const SUBAGENT_DEFAULT_MAX_TURNS = 24;
-export const SUBAGENT_DEFAULT_MAX_TOOL_CALLS = 120;
-export const SUBAGENT_DEFAULT_TIMEOUT_SECONDS = 1200;
+// Canonical definitions live in types.ts (light constants module): the
+// extension entry imports them statically for tool-schema descriptions.
+export {
+  SUBAGENT_DEFAULT_MAX_TOOL_CALLS,
+  SUBAGENT_DEFAULT_MAX_TURNS,
+  SUBAGENT_DEFAULT_TIMEOUT_SECONDS,
+} from './types.js';
+
 export const SUBAGENT_MAX_TOOL_RESULT_BYTES = 64 * 1024;
 export const SUBAGENT_MAX_TOTAL_TOOL_OUTPUT_BYTES = 64 * 1024 * 1024;
 export const SUBAGENT_MAX_ANSWER_BYTES = 4 * 1024 * 1024;

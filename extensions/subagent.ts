@@ -9,27 +9,28 @@ import type {
 } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
 import { type Static, Type } from 'typebox';
-import { type StructuredSubagentPiLaunchRequest, SubagentAttestedSupervisor } from './attested.js';
+import type { StructuredSubagentPiLaunchRequest, SubagentAttestedSupervisor } from './attested.js';
 import type { ExternalTaskSnapshot } from './background-client.js';
 import { type ConnectOptions, SubagentBackgroundClient } from './background-client.js';
-import {
-  decideSubagentDelivery,
-  inlineTooLarge,
-  SUBAGENT_DEFAULT_MAX_TOOL_CALLS,
-  SUBAGENT_DEFAULT_MAX_TURNS,
-  SUBAGENT_DEFAULT_TIMEOUT_SECONDS,
-} from './budget.js';
 import { truncateChars } from './common.js';
 import {
   loadSubagentHookContractEvidence,
   type SubagentHookContractEvidence,
 } from './hook-contract.js';
-import { resolveSubagentRoute } from './launch.js';
-import { prepareSubagentLaunch, SubagentRunSupervisor, type SubagentSpawn } from './runner.js';
+import {
+  loadAttestedModule,
+  loadBudgetModule,
+  loadLaunchModule,
+  loadRunnerModule,
+} from './lazy.js';
+import type { SubagentRunSupervisor, SubagentSpawn } from './runner.js';
 import {
   SUBAGENT_ATTESTED_LAUNCH_DETAILS_SCHEMA_VERSION,
   SUBAGENT_AUTO_DELIVER_MODES,
   SUBAGENT_CAPABILITIES,
+  SUBAGENT_DEFAULT_MAX_TOOL_CALLS,
+  SUBAGENT_DEFAULT_MAX_TURNS,
+  SUBAGENT_DEFAULT_TIMEOUT_SECONDS,
   SUBAGENT_EXTENSION_MODES,
   SUBAGENT_LAUNCH_DETAILS_SCHEMA_VERSION,
   SUBAGENT_RESULT_TOOL_NAME,
@@ -53,6 +54,14 @@ import {
  * dependency error is reported loudly and NONE of the three tools is
  * registered. On success exactly `subagent_run`, `subagent_result`, and
  * `subagent_run_attested` are registered.
+ *
+ * Startup cost: this module and its static import closure stay light on
+ * purpose. The heavy graphs (`./runner.js`, `./launch.js`, `./budget.js`,
+ * `./attested.js`, and through them `@sakiko233/pi-agent-runtime`) cost
+ * ~660-720 ms of jiti transpile on every Pi start, so they are imported
+ * lazily at first tool execution through `./lazy.js`. The contract is pinned
+ * by `test/startup-import-contract.test.ts`; the budget by
+ * `scripts/startup-budget.mjs`.
  */
 
 /** Shipped copy of the observed Pi hook-contract evidence, loaded once per launch. */
@@ -382,12 +391,52 @@ async function defaultHookEvidence(): Promise<SubagentHookContractEvidence> {
 
 interface SessionState {
   client: SubagentBackgroundClient;
-  runs: SubagentRunSupervisor;
-  attested: SubagentAttestedSupervisor;
+  /** Constructed at first subagent_run/subagent_result call, never at startup. */
+  runs: Promise<SubagentRunSupervisor> | undefined;
+  /** Constructed at first subagent_run_attested call, never at startup. */
+  attested: Promise<SubagentAttestedSupervisor> | undefined;
 }
 
 export function createSubagentExtension(deps: SubagentExtensionDeps = {}) {
   const logger = deps.logger ?? console;
+
+  const ensureRuns = (session: SessionState): Promise<SubagentRunSupervisor> => {
+    if (session.runs === undefined) {
+      session.runs = (async () => {
+        const { SubagentRunSupervisor: Supervisor } = await loadRunnerModule();
+        return new Supervisor({
+          client: session.client,
+          spawn: deps.spawn,
+          killProcess: deps.killProcess,
+          platform: deps.platform,
+          logger,
+          killGraceMs: deps.killGraceMs,
+          logFlushMs: deps.logFlushMs,
+          outputCapBytes: deps.outputCapBytes,
+          timeoutOverrideMs: deps.timeoutOverrideMs,
+        });
+      })();
+    }
+    return session.runs;
+  };
+
+  const ensureAttested = (session: SessionState): Promise<SubagentAttestedSupervisor> => {
+    if (session.attested === undefined) {
+      session.attested = (async () => {
+        const { SubagentAttestedSupervisor: Supervisor } = await loadAttestedModule();
+        return new Supervisor({
+          client: session.client,
+          spawn: deps.spawn,
+          killProcess: deps.killProcess,
+          platform: deps.platform,
+          logger,
+          killGraceMs: deps.killGraceMs,
+          timeoutOverrideMs: deps.timeoutOverrideMs,
+        });
+      })();
+    }
+    return session.attested;
+  };
 
   return function subagentExtension(pi: ExtensionAPI): void {
     let state: SessionState | undefined;
@@ -416,29 +465,15 @@ export function createSubagentExtension(deps: SubagentExtensionDeps = {}) {
         reportDependencyFailure(pi, ctx, error);
         return;
       }
-      const runs = new SubagentRunSupervisor({
-        client,
-        spawn: deps.spawn,
-        killProcess: deps.killProcess,
-        platform: deps.platform,
-        logger,
-        killGraceMs: deps.killGraceMs,
-        logFlushMs: deps.logFlushMs,
-        outputCapBytes: deps.outputCapBytes,
-        timeoutOverrideMs: deps.timeoutOverrideMs,
-      });
-      const attested = new SubagentAttestedSupervisor({
-        client,
-        spawn: deps.spawn,
-        killProcess: deps.killProcess,
-        platform: deps.platform,
-        logger,
-        killGraceMs: deps.killGraceMs,
-        timeoutOverrideMs: deps.timeoutOverrideMs,
-      });
-      state = { client, runs, attested };
+      state = { client, runs: undefined, attested: undefined };
       if (!toolsRegistered) {
-        registerSubagentTools(pi, requireState, deps.loadHookEvidence ?? defaultHookEvidence);
+        registerSubagentTools(
+          pi,
+          requireState,
+          ensureRuns,
+          ensureAttested,
+          deps.loadHookEvidence ?? defaultHookEvidence,
+        );
         toolsRegistered = true;
       }
     });
@@ -448,9 +483,28 @@ export function createSubagentExtension(deps: SubagentExtensionDeps = {}) {
       state = undefined;
       if (current === undefined) return;
       const reason = 'Killed during Pi session shutdown/reload';
-      await Promise.all([current.runs.shutdown(reason), current.attested.shutdown(reason)]);
-      current.runs.close();
-      current.attested.close();
+      const shutdowns: Promise<void>[] = [];
+      const runsPromise = current.runs;
+      if (runsPromise !== undefined) {
+        shutdowns.push(
+          (async () => {
+            const supervisor = await runsPromise;
+            await supervisor.shutdown(reason);
+            supervisor.close();
+          })(),
+        );
+      }
+      const attestedPromise = current.attested;
+      if (attestedPromise !== undefined) {
+        shutdowns.push(
+          (async () => {
+            const supervisor = await attestedPromise;
+            await supervisor.shutdown(reason);
+            supervisor.close();
+          })(),
+        );
+      }
+      await Promise.all(shutdowns);
     });
   };
 
@@ -475,6 +529,8 @@ export function createSubagentExtension(deps: SubagentExtensionDeps = {}) {
 function registerSubagentTools(
   pi: ExtensionAPI,
   requireState: () => SessionState,
+  ensureRuns: (state: SessionState) => Promise<SubagentRunSupervisor>,
+  ensureAttested: (state: SessionState) => Promise<SubagentAttestedSupervisor>,
   loadHookEvidence: () => Promise<SubagentHookContractEvidence>,
 ): void {
   pi.registerTool<typeof SubagentRunParams, SubagentLaunchDetails>({
@@ -537,6 +593,11 @@ function registerSubagentTools(
       const extensionMode = requireExtensionMode(params.extensionMode);
       const autoDeliver = requireAutoDeliver(params.autoDeliver);
       const hookEvidence = await loadHookEvidence();
+      const [{ prepareSubagentLaunch }, { resolveSubagentRoute }, runs] = await Promise.all([
+        loadRunnerModule(),
+        loadLaunchModule(),
+        ensureRuns(current),
+      ]);
       const route = resolveSubagentRoute({
         requested: params.route,
         currentModel:
@@ -577,7 +638,7 @@ function registerSubagentTools(
         autoDeliver,
       });
 
-      const record = await current.runs.start({
+      const record = await runs.start({
         prepared,
         name: params.name,
         description: `subagent_run on ${route.qualified_id}: ${truncateChars(params.prompt.split('\n')[0] ?? '', 80)}`,
@@ -678,7 +739,8 @@ function registerSubagentTools(
     },
     async execute(_toolCallId, params) {
       const current = requireState();
-      const record = current.runs.resolve(params.taskId);
+      const [runs, budgetModule] = await Promise.all([ensureRuns(current), loadBudgetModule()]);
+      const record = runs.resolve(params.taskId);
       const requestedDelivery = requireDelivery(params.delivery);
 
       if (record.state === 'running') {
@@ -716,12 +778,12 @@ function registerSubagentTools(
       }
 
       const verified = evaluation.result;
-      const decision = decideSubagentDelivery(
+      const decision = budgetModule.decideSubagentDelivery(
         verified.package.answer.byte_length,
         requestedDelivery,
       );
       if (requestedDelivery === 'inline' && decision.mode === 'artifact') {
-        throw inlineTooLarge(
+        throw budgetModule.inlineTooLarge(
           record.facts.taskId,
           record.facts.artifactDir,
           verified.package.answer.byte_length,
@@ -843,7 +905,8 @@ function registerSubagentTools(
     },
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const current = requireState();
-      const record = await current.attested.start({
+      const attested = await ensureAttested(current);
+      const record = await attested.start({
         request: params,
         cwd: ctx.cwd,
         modelRegistry: ctx.modelRegistry,
