@@ -18,8 +18,8 @@
  * 2 = usage error.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -111,7 +111,10 @@ try {
     process.exit(1);
   }
   const installedRuntime = JSON.parse(
-    await readFile(join(packageDir, 'node_modules', '@sakiko233', 'pi-agent-runtime', 'package.json'), 'utf8'),
+    await readFile(
+      join(packageDir, 'node_modules', '@sakiko233', 'pi-agent-runtime', 'package.json'),
+      'utf8',
+    ),
   );
   console.error(`runtime resolved: @sakiko233/pi-agent-runtime@${installedRuntime.version}`);
 
@@ -129,7 +132,9 @@ try {
   await rm(join(repoRoot, tarball), { force: true });
 
   console.error('');
-  console.error(`startup budget: median module import ${median}ms over ${measuredRuns} runs (budget ${budgetMs}ms)`);
+  console.error(
+    `startup budget: median module import ${median}ms over ${measuredRuns} runs (budget ${budgetMs}ms)`,
+  );
   if (median > budgetMs) {
     console.error(`FAIL: median ${median}ms exceeds the ${budgetMs}ms budget`);
     console.error(`runs: ${runs.join(', ')}`);
