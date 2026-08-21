@@ -31,15 +31,26 @@ const ENTRY_STATIC_IMPORT_ALLOWLIST = new Set([
   './background-client.js',
   './common.js',
   './hook-contract.js',
+  './lazy.js',
   './types.js',
 ]);
+
+/** Map an ESM `.js` specifier to its TypeScript source file. */
+function sourceFileFor(relative: string): string {
+  return join(extensionsDir, relative.replace(/\.js$/, '.ts'));
+}
 
 /**
  * Modules in the entry's static closure that must themselves stay light.
  * Their static value imports are limited to node builtins, host packages the
  * loader aliases natively, and other light modules in this set.
  */
-const LIGHT_MODULE_CLOSURE = ['./background-client.js', './common.js', './hook-contract.js', './types.js'];
+const LIGHT_MODULE_CLOSURE = [
+  './background-client.js',
+  './common.js',
+  './hook-contract.js',
+  './types.js',
+];
 
 interface StaticImport {
   /** Import specifier exactly as written. */
@@ -85,12 +96,17 @@ describe('startup import contract', () => {
     const source = await readFile(join(extensionsDir, 'subagent.ts'), 'utf8');
     const valueImports = extractStaticImports(source).filter((entry) => !entry.typeOnly);
     const specifiers = valueImports.map((entry) => entry.specifier);
-    const disallowed = specifiers.filter((specifier) => !ENTRY_STATIC_IMPORT_ALLOWLIST.has(specifier));
+    const disallowed = specifiers.filter(
+      (specifier) => !ENTRY_STATIC_IMPORT_ALLOWLIST.has(specifier),
+    );
     expect(
       disallowed,
       `subagent.ts must not statically import heavy modules; found: ${disallowed.join(', ')}`,
     ).toEqual([]);
-    expect(specifiers.length, 'the entry must keep at least its light modules static').toBeGreaterThan(0);
+    expect(
+      specifiers.length,
+      'the entry must keep at least its light modules static',
+    ).toBeGreaterThan(0);
   });
 
   it('the entry never statically imports the shared runtime as a value', async () => {
@@ -101,28 +117,34 @@ describe('startup import contract', () => {
     expect(runtimeImports, 'runtime must be reached only via lazy dynamic import').toEqual([]);
   });
 
-  it.each(LIGHT_MODULE_CLOSURE)('%s stays light: no static value import outside node builtins, aliased host packages, and the light closure', async (relative) => {
-    const source = await readFile(join(extensionsDir, relative), 'utf8');
-    const valueImports = extractStaticImports(source).filter((entry) => !entry.typeOnly);
-    const allowed = new Set<string>([
-      ...[...LIGHT_MODULE_CLOSURE, './lazy.js'].filter((entry) => entry !== relative),
-    ]);
-    const disallowed = valueImports
-      .map((entry) => entry.specifier)
-      .filter(
-        (specifier) =>
-          !specifier.startsWith('node:') &&
-          !specifier.startsWith('@earendil-works/') &&
-          specifier !== 'typebox' &&
-          !allowed.has(specifier),
-      );
-    expect(disallowed, `${relative} pulls heavy static imports: ${disallowed.join(', ')}`).toEqual([]);
-  });
+  it.each(LIGHT_MODULE_CLOSURE)(
+    '%s stays light: no static value import outside node builtins, aliased host packages, and the light closure',
+    async (relative) => {
+      const source = await readFile(sourceFileFor(relative), 'utf8');
+      const valueImports = extractStaticImports(source).filter((entry) => !entry.typeOnly);
+      const allowed = new Set<string>([
+        ...[...LIGHT_MODULE_CLOSURE, './lazy.js'].filter((entry) => entry !== relative),
+      ]);
+      const disallowed = valueImports
+        .map((entry) => entry.specifier)
+        .filter(
+          (specifier) =>
+            !specifier.startsWith('node:') &&
+            !specifier.startsWith('@earendil-works/') &&
+            specifier !== 'typebox' &&
+            !allowed.has(specifier),
+        );
+      expect(
+        disallowed,
+        `${relative} pulls heavy static imports: ${disallowed.join(', ')}`,
+      ).toEqual([]);
+    },
+  );
 
   it('the lazy loaders exist for every heavy module kept off the startup path', async () => {
     const source = await readFile(join(extensionsDir, 'lazy.ts'), 'utf8');
     for (const heavy of ['./runner.js', './attested.js', './launch.js', './budget.js']) {
-      expect(source, `lazy.ts must dynamically import ${heavy}`).toContain(`import(${JSON.stringify(heavy)})`);
+      expect(source, `lazy.ts must dynamically import ${heavy}`).toContain(`import('${heavy}')`);
     }
   });
 });
