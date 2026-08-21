@@ -6,12 +6,13 @@ import { resolve } from 'node:path';
  * Bootstrap development dependencies, installing the sibling `pi-agent-runtime`
  * checkout as a packed tarball.
  *
- * The runtime is not yet published to npm, so a plain `npm install` fails with
- * E404 on the runtime dependency. This script is the entry point for fresh
- * checkouts: it packs the sibling repository exactly the way the runtime's own
- * synthetic-consumer tests do, then installs the full dependency tree with the
- * tarball satisfying the manifest's published `^0.1.1` range (`--no-save` keeps
- * package.json on the published range).
+ * The runtime is published to npm, but this setup command deliberately uses
+ * the sibling checkout's packed bytes so development and coordinated local
+ * changes are tested instead of silently resolving the registry copy. It packs
+ * the sibling repository exactly the way the runtime's own synthetic-consumer
+ * tests do, then installs the full dependency tree with the tarball satisfying
+ * the manifest's published `^0.1.1` range (`--no-save` keeps package.json on
+ * the published range).
  */
 
 const runtimeRoot = resolve(process.cwd(), '..', 'pi-agent-runtime');
