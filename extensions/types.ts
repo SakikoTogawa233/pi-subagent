@@ -20,6 +20,13 @@ import type {
  * observed and tested in the source repository.
  */
 
+/** Default subagent_run limits advertised in the tool schema. Light by design:
+ * the entry imports them statically at registration time, so they live here in
+ * the light constants module rather than in budget.ts (heavy runtime graph). */
+export const SUBAGENT_DEFAULT_MAX_TURNS = 24;
+export const SUBAGENT_DEFAULT_MAX_TOOL_CALLS = 120;
+export const SUBAGENT_DEFAULT_TIMEOUT_SECONDS = 1200;
+
 export const SUBAGENT_SEED_SCHEMA_VERSION = 'pi-subagent.seed.v2' as const;
 export const SUBAGENT_LEDGER_SCHEMA_VERSION = 'pi-subagent.ledger.v1' as const;
 export const SUBAGENT_RESULT_PACKAGE_SCHEMA_VERSION = 'pi-subagent.result.v1' as const;
