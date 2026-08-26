@@ -165,9 +165,9 @@ async function assertTwoPackageTopology(agentDir: string, runtimeVersion: string
 }
 
 beforeAll(async () => {
-  expect(execFileSync(process.execPath, [pi0842Cli, '--version'], { encoding: 'utf8' }).trim()).toBe(
-    '0.84.2',
-  );
+  expect(
+    execFileSync(process.execPath, [pi0842Cli, '--version'], { encoding: 'utf8' }).trim(),
+  ).toBe('0.84.2');
   const root = await mkdtemp(join(tmpdir(), 'pi-subagent-runtime-install-suite-'));
   roots.push(root);
   for (const [path, digest] of Object.entries(expectedFixtureSha512)) {

@@ -143,13 +143,7 @@ function runProbe(
   route: RouteFixture,
   label: string,
 ): ProbeResult {
-  const cwd = join(
-    suiteRoot,
-    'runs',
-    label,
-    host.version,
-    route.mode,
-  );
+  const cwd = join(suiteRoot, 'runs', label, host.version, route.mode);
   const result = spawnSync(
     process.execPath,
     [probeScript, host.loaderPath, entry, route.mode, cwd],

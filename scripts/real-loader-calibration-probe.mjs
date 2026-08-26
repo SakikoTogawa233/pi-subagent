@@ -193,7 +193,13 @@ const params = definition.prepareArguments(rawParams);
 
 let outcome;
 try {
-  const result = await definition.execute('call-calibration-probe', params, undefined, undefined, ctx);
+  const result = await definition.execute(
+    'call-calibration-probe',
+    params,
+    undefined,
+    undefined,
+    ctx,
+  );
   const artifactDir = result.details.artifact_dir;
   const plan = JSON.parse(await readFile(join(cwd, artifactDir, 'budget-plan.json'), 'utf8'));
   outcome = {
