@@ -17,23 +17,39 @@ let runnerModule: Promise<typeof import('./runner.js')> | undefined;
 let launchModule: Promise<typeof import('./launch.js')> | undefined;
 let budgetModule: Promise<typeof import('./budget.js')> | undefined;
 let attestedModule: Promise<typeof import('./attested.js')> | undefined;
+let heavyImportChain: Promise<void> = Promise.resolve();
+
+/**
+ * Serialize lazy graph roots across Jiti's shared parent cache.
+ *
+ * Jiti publishes an async module into `parentCache` before evaluation finishes,
+ * and a concurrent import returns that module's current `exports` immediately.
+ * The runtime barrel installs re-exports sequentially, so overlapping heavy
+ * roots can observe it before the token-budget exports exist. One import root at
+ * a time keeps every named binding behind the completed barrel evaluation.
+ */
+function serializeHeavyImport<T>(load: () => Promise<T>): Promise<T> {
+  const loaded = heavyImportChain.then(load);
+  heavyImportChain = loaded.then(() => undefined);
+  return loaded;
+}
 
 export function loadRunnerModule(): Promise<typeof import('./runner.js')> {
-  runnerModule ??= import('./runner.js');
+  runnerModule ??= serializeHeavyImport(() => import('./runner.js'));
   return runnerModule;
 }
 
 export function loadLaunchModule(): Promise<typeof import('./launch.js')> {
-  launchModule ??= import('./launch.js');
+  launchModule ??= serializeHeavyImport(() => import('./launch.js'));
   return launchModule;
 }
 
 export function loadBudgetModule(): Promise<typeof import('./budget.js')> {
-  budgetModule ??= import('./budget.js');
+  budgetModule ??= serializeHeavyImport(() => import('./budget.js'));
   return budgetModule;
 }
 
 export function loadAttestedModule(): Promise<typeof import('./attested.js')> {
-  attestedModule ??= import('./attested.js');
+  attestedModule ??= serializeHeavyImport(() => import('./attested.js'));
   return attestedModule;
 }

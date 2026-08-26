@@ -14,6 +14,14 @@ const repoRoot = resolve(import.meta.dirname, '..');
 const fixtures = join(repoRoot, 'test', 'fixtures');
 const registryScript = join(repoRoot, 'scripts', 'test-fixture-registry.mjs');
 const smokeScript = join(repoRoot, 'scripts', 'smoke-installed-packages.mjs');
+const pi0842Cli = join(
+  repoRoot,
+  'node_modules',
+  '@earendil-works',
+  'pi-coding-agent',
+  'dist',
+  'cli.js',
+);
 const roots: string[] = [];
 let registry: ChildProcessWithoutNullStreams;
 let registryUrl: string;
@@ -89,7 +97,7 @@ async function createAgentDir(root: string): Promise<string> {
 }
 
 function piInstall(agentDir: string, source: string): string {
-  return execFileSync('pi', ['install', source], {
+  return execFileSync(process.execPath, [pi0842Cli, 'install', source], {
     cwd: repoRoot,
     encoding: 'utf8',
     env: {
@@ -157,7 +165,9 @@ async function assertTwoPackageTopology(agentDir: string, runtimeVersion: string
 }
 
 beforeAll(async () => {
-  expect(execFileSync('pi', ['--version'], { encoding: 'utf8' }).trim()).toBe('0.84.2');
+  expect(
+    execFileSync(process.execPath, [pi0842Cli, '--version'], { encoding: 'utf8' }).trim(),
+  ).toBe('0.84.2');
   const root = await mkdtemp(join(tmpdir(), 'pi-subagent-runtime-install-suite-'));
   roots.push(root);
   for (const [path, digest] of Object.entries(expectedFixtureSha512)) {
