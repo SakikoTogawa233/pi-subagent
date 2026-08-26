@@ -9,6 +9,7 @@ installation topology without depending on the live registry during the regressi
 | `@sakiko233/pi-agent-runtime` | 0.1.1 | `b947798408aac2a7298bb3c8ffb94866b875795ca0bc0a8f8be0e5f69c88a58a50714c49abbc1e31ec3f992d8c7cc7c821263fdec3f0bbb68a19004c94a6f071` |
 | `@sakiko233/pi-background-tasks` | 3.0.0 | `66ccf162a758844a13c852b052577a713910acaeb103b536f3834c6108ab1c40607e1cf27f6dc4939f6f3ad65e899f739feefc58b80f3bb881897ae4c74e46e6` |
 | `@sakiko233/pi-subagent` | 0.1.0 | `f6bb0cd35e2db81914bf61dfc52b48267acc24ea14bb8b1eb8c70ecaef252e98dc9c93478075a363482d1db34d50727f2ce8be03cc00eb0df5b8d5478ed55fc8` |
+| `@sakiko233/pi-subagent` | 0.1.2 | `4482073121ed001382bf180e8e774df8d696ba36dae3b0b769686a57aa7aacff9ba28185ef99fb53cae09119917726d3a7b1389bab9e475e73a73b5590dd4ff4` |
 
 The local fixture registry serves these immutable tarballs through normal npm metadata endpoints.
 The repaired 0.1.1 consumer tarball is packed directly from the release-prepared working tree. The
