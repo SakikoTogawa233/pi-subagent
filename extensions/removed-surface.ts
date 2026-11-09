@@ -1,10 +1,9 @@
 /**
- * The removed background-tasks agent surface and the child exclusion list.
+ * The removed background-tasks agent surface registry.
  *
  * This is the ONLY module in the package where removed names may appear. Old
  * tool names and schema ids are not compatibility aliases: they are recorded
- * here so the child guard can exclude them explicitly, and so the surface test
- * can assert every other shipped file is free of them.
+ * here so the surface test can assert every other shipped file is free of them.
  */
 
 /**
@@ -37,30 +36,3 @@ export const DELEGATE_REMOVED = [
   'delegate_read_artifact',
   'phase2.pi_task_attestation.v1',
 ] as const;
-
-/**
- * Tool names that must never appear in a subagent child, whichever capability
- * is selected in v1. Shell, write, background, Fusion, and self-recursive
- * delegation tools are all excluded by name as a second barrier behind the
- * `--tools` allowlist.
- */
-export const SUBAGENT_FORBIDDEN_TOOLS: readonly string[] = [
-  'bash',
-  'edit',
-  'write',
-  'bg_run',
-  'bg_delegate',
-  'bg_result',
-  'bg_kill',
-  'bg_status',
-  'bg_logs',
-  'bg_run_pi_attested',
-  'subagent_run',
-  'subagent_result',
-  'subagent_run_attested',
-  'fusion_brainstorm',
-  'fusion_reason',
-  'fusion_investigate',
-  'fusion_research',
-  'fusion_validate',
-];

@@ -14,7 +14,6 @@ import {
   buildSubagentChildArgv,
   buildSubagentChildPrompt,
   buildSubagentChildSystemPrompt,
-  delegateToolsFor,
   ensureSubagentChildSessionDir,
   makeSubagentChildSessionId,
   makeSubagentLaunchNonce,
@@ -26,9 +25,7 @@ import {
   SUBAGENT_REMOVED_ENV_KEYS,
   subagentChildEnv,
 } from '../extensions/launch.js';
-import { SUBAGENT_FORBIDDEN_TOOLS } from '../extensions/removed-surface.js';
 import {
-  SUBAGENT_INSPECT_TOOLS,
   SUBAGENT_TASK_ID_PATTERN,
   SubagentError,
   type SubagentPinnedRoute,
@@ -166,40 +163,24 @@ describe('subagent child isolation surface', () => {
     ).toBe(true);
   });
 
-  it('admits only inspect and refuses any capability that would enable forbidden tools', () => {
-    expect(delegateToolsFor('inspect')).toEqual(SUBAGENT_INSPECT_TOOLS);
-    const failure = (() => {
-      try {
-        delegateToolsFor('write' as never);
-      } catch (error) {
-        return error;
-      }
-      throw new Error('expected capability refusal');
-    })();
-    expect(failure).toBeInstanceOf(SubagentError);
-    expect((failure as SubagentError).code).toBe('subagent_isolation_unsupported');
-  });
-
-  it('builds an argv that allowlists read-only tools and pins the route', () => {
+  it('preserves normal Pi tools and pins the route', () => {
     const argv = buildSubagentChildArgv({
       route,
-      capability: 'inspect',
       extensionMode: 'isolated',
       childSessionId: 'subagent-child-1',
       childSessionDir: '/tmp/child-session',
       childExtensionPath: '/pkg/extensions/subagent-child.ts',
       systemPrompt: 'child system prompt',
     });
-    const toolsIndex = argv.indexOf('--tools');
-    expect(argv[toolsIndex + 1]?.split(',')).toEqual([...SUBAGENT_INSPECT_TOOLS]);
-    expect(argv).toContain('--no-builtin-tools');
+    expect(argv).not.toContain('--tools');
+    expect(argv).not.toContain('--no-builtin-tools');
+    expect(argv).not.toContain('--no-tools');
+    expect(argv).not.toContain('--exclude-tools');
     expect(argv).toContain('--no-extensions');
     expect(argv).toContain('--no-skills');
     expect(argv).toContain('--no-prompt-templates');
     expect(argv).toContain('--no-themes');
     expect(argv).toContain('--no-context-files');
-    const excludeIndex = argv.indexOf('--exclude-tools');
-    expect(argv[excludeIndex + 1]?.split(',')).toEqual([...SUBAGENT_FORBIDDEN_TOOLS]);
     expect(argv).toContain('subagent-child-1');
     expect(argv).toContain('test-provider');
     expect(argv).toContain('test-model');
@@ -207,10 +188,9 @@ describe('subagent child isolation surface', () => {
     expect(argv.filter((arg) => arg === '--provider')).toEqual(['--provider']);
   });
 
-  it('enables ambient extension discovery only when explicitly requested', () => {
+  it('keeps extension discovery enabled in ambient mode', () => {
     const argv = buildSubagentChildArgv({
       route,
-      capability: 'inspect',
       extensionMode: 'ambient',
       childSessionId: 'subagent-child-1',
       childSessionDir: '/tmp/child-session',
@@ -228,7 +208,6 @@ describe('subagent child isolation surface', () => {
     };
     const argv = buildSubagentChildArgv({
       route: anthropicRoute,
-      capability: 'inspect',
       extensionMode: 'isolated',
       childSessionId: 'subagent-child-1',
       childSessionDir: '/tmp/child-session',
@@ -242,7 +221,6 @@ describe('subagent child isolation surface', () => {
     expect(extensionPaths[1]).toContain('subagent-child');
     const nonAnthropic = buildSubagentChildArgv({
       route,
-      capability: 'inspect',
       extensionMode: 'isolated',
       childSessionId: 'subagent-child-1',
       childSessionDir: '/tmp/child-session',
@@ -299,7 +277,6 @@ describe('subagent launch preflight', () => {
       ctx: parentContext(),
       toolCallId: 'call-1',
       prompt: 'investigate the flaky test',
-      capability: 'inspect',
       extensionMode: 'isolated',
       route,
       limitOverrides: {},
@@ -309,7 +286,8 @@ describe('subagent launch preflight', () => {
     expect(result.childPrompt).toContain('TASK SEED (JSON)');
     expect(result.childPrompt).toContain('investigate the flaky test');
     expect(result.childPrompt).toContain('YOUR DIRECTIVE (authoritative');
-    expect(result.childSystemPrompt).toContain('inspect-only');
+    expect(result.childSystemPrompt).toContain('file edits');
+    expect(result.childSystemPrompt).not.toContain('inspect-only');
     expect(result.seed.seed.task_id).toBe(result.taskId);
     expect(result.plan.fits).toBe(true);
   });

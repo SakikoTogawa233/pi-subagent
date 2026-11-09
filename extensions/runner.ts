@@ -142,7 +142,6 @@ export async function prepareSubagentLaunch(
     const seedPathAbs = join(store.artifactDirAbs, 'seed.json');
     const argv = buildSubagentChildArgv({
       route: input.route,
-      capability: input.capability,
       extensionMode: input.extensionMode,
       childSessionId: preflight.childSessionId,
       childSessionDir: childSessionDirAbs,

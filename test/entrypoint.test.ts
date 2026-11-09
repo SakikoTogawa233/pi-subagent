@@ -197,6 +197,7 @@ describe('entrypoint startup gating', () => {
     await h.start(await tempCwd());
     for (const [name, args] of [
       [SUBAGENT_RUN_TOOL_NAME, { name: 'x', prompt: 'y', bogus: 1 }],
+      [SUBAGENT_RUN_TOOL_NAME, { name: 'x', prompt: 'y', capability: 'inspect' }],
       [SUBAGENT_RESULT_TOOL_NAME, { taskId: 'x', bogus: 1 }],
       [
         SUBAGENT_RUN_ATTESTED_TOOL_NAME,
@@ -230,6 +231,11 @@ describe('subagent_run and subagent_result through the entrypoint', () => {
     expect(receiptText).toContain('subagent');
     const details = receipt.details ?? {};
     expect(details['schema_version']).toBe(SUBAGENT_LAUNCH_DETAILS_SCHEMA_VERSION);
+    expect(details['extension_mode']).toBe('ambient');
+    expect(h.fake.calls[0]?.args).not.toContain('--no-extensions');
+    expect(h.fake.calls[0]?.args).not.toContain('--no-builtin-tools');
+    expect(h.fake.calls[0]?.args).not.toContain('--tools');
+    expect(h.fake.calls[0]?.args).not.toContain('--exclude-tools');
     const subagentTaskId = details['task_id'];
     expect(typeof subagentTaskId).toBe('string');
     expect(subagentTaskId as string).toMatch(/^s[0-9a-f]{32}$/);

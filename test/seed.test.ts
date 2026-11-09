@@ -81,12 +81,11 @@ describe('subagent seed construction', () => {
       launchNonce: nonceHex('n'),
       toolCallId: 'call-1',
       directive: 'find the root cause of the incident',
-      capability: 'inspect',
       extensionMode: 'isolated',
       route,
       limits: resolveSubagentLimits(route),
     });
-    expect(built.seed.schema_version).toBe('pi-subagent.seed.v2');
+    expect(built.seed.schema_version).toBe('pi-subagent.seed.v3');
     expect(built.seed.directive.text).toBe('find the root cause of the incident');
     expect(built.seed.directive.authority).toBe('explicit_text');
     expect(built.seed.parent_system_prompt).toBe('parent system prompt');
@@ -99,7 +98,6 @@ describe('subagent seed construction', () => {
     expect(built.sha256).toMatch(/^[0-9a-f]{64}$/);
     const parsed = JSON.parse(built.serialized);
     expect(Object.keys(parsed).sort()).toEqual([
-      'capability',
       'conversation_projection',
       'cwd',
       'directive',
@@ -124,7 +122,6 @@ describe('subagent seed construction', () => {
       launchNonce: nonceHex('n'),
       toolCallId: 'call-1',
       directive: 'directive',
-      capability: 'inspect',
       extensionMode: 'isolated',
       route,
       limits: resolveSubagentLimits(route),
@@ -140,7 +137,6 @@ describe('subagent seed construction', () => {
       launchNonce: nonceHex('m'),
       toolCallId: 'call-2',
       directive: 'sibling directive',
-      capability: 'inspect',
       extensionMode: 'isolated',
       route,
       limits: resolveSubagentLimits(route),
@@ -159,7 +155,6 @@ describe('subagent seed construction', () => {
         launchNonce: nonceHex('n'),
         toolCallId: 'call-1',
         directive: '   ',
-        capability: 'inspect',
         extensionMode: 'isolated',
         route,
         limits: resolveSubagentLimits(route),
@@ -178,7 +173,6 @@ describe('subagent seed verification (child side)', () => {
     launchNonce: nonceHex('n'),
     toolCallId: 'call-1',
     directive: 'the directive',
-    capability: 'inspect',
     extensionMode: 'isolated',
     route,
     limits: resolveSubagentLimits(route),
@@ -190,7 +184,6 @@ describe('subagent seed verification (child side)', () => {
       taskId: built.seed.task_id,
       launchNonce: built.seed.launch_nonce,
     });
-    expect(seed.capability).toBe('inspect');
     expect(seed.extension_mode).toBe('isolated');
     expect(seed.route.provider).toBe('test-provider');
     expect(seed.route.thinking_level).toBe('medium');

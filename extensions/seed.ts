@@ -15,7 +15,6 @@ import {
   SUBAGENT_RUN_TOOL_NAME,
   SUBAGENT_SEED_SCHEMA_VERSION,
   type SubagentBranchFilterDescriptor,
-  type SubagentCapability,
   type SubagentContextPolicyDescriptor,
   type SubagentConversationProjection,
   SubagentError,
@@ -23,7 +22,7 @@ import {
   type SubagentLedgerV1,
   type SubagentLimits,
   type SubagentPinnedRoute,
-  type SubagentSeedV2,
+  type SubagentSeedV3,
   type SubagentTaskDirective,
 } from './types.js';
 
@@ -45,14 +44,13 @@ export interface BuildSubagentSeedOptions {
   launchNonce: string;
   toolCallId: string | undefined;
   directive: string;
-  capability: SubagentCapability;
   extensionMode: SubagentExtensionMode;
   route: SubagentPinnedRoute;
   limits: SubagentLimits;
 }
 
 export interface BuiltSubagentSeed {
-  seed: SubagentSeedV2;
+  seed: SubagentSeedV3;
   /** Exact bytes persisted and written to the child. Nothing re-serializes them. */
   serialized: string;
   sha256: string;
@@ -170,12 +168,11 @@ export function buildSubagentSeed(
     sha256: sha256Text(directiveText),
     authority: 'explicit_text',
   };
-  const seed: SubagentSeedV2 = {
+  const seed: SubagentSeedV3 = {
     schema_version: SUBAGENT_SEED_SCHEMA_VERSION,
     task_id: options.taskId,
     launch_nonce: options.launchNonce,
     cwd: ctx.cwd,
-    capability: options.capability,
     extension_mode: options.extensionMode,
     route: options.route,
     parent_system_prompt: ctx.getSystemPrompt(),
@@ -199,7 +196,7 @@ const isRecord = (value: unknown): value is Record<PropertyKey, unknown> =>
 export function verifySubagentSeedBytes(
   raw: string,
   expected: { sha256: string; taskId: string; launchNonce: string },
-): SubagentSeedV2 {
+): SubagentSeedV3 {
   const actual = sha256Text(raw);
   if (actual !== expected.sha256) {
     throw new SubagentError(
@@ -297,15 +294,7 @@ function requireNonNegativeInteger(
 }
 
 /** Explicit, field-by-field reconstruction of the seed fields the child consumes. */
-function rebuildSeed(record: Record<PropertyKey, unknown>, taskId: string): SubagentSeedV2 {
-  const capability = requireString(record, 'capability', taskId);
-  if (capability !== 'inspect') {
-    throw new SubagentError(`subagent seed capability ${capability} is not supported`, {
-      code: 'subagent_isolation_unsupported',
-      childCreated: true,
-      taskId,
-    });
-  }
+function rebuildSeed(record: Record<PropertyKey, unknown>, taskId: string): SubagentSeedV3 {
   const extensionMode = requireString(record, 'extension_mode', taskId);
   if (extensionMode !== 'isolated' && extensionMode !== 'ambient') {
     throw new SubagentError(`subagent seed extension mode ${extensionMode} is not recognised`, {
@@ -395,7 +384,6 @@ function rebuildSeed(record: Record<PropertyKey, unknown>, taskId: string): Suba
     task_id: requireString(record, 'task_id', taskId),
     launch_nonce: requireString(record, 'launch_nonce', taskId),
     cwd: requireString(record, 'cwd', taskId),
-    capability,
     extension_mode: extensionMode,
     route,
     parent_system_prompt: requireString(record, 'parent_system_prompt', taskId),
