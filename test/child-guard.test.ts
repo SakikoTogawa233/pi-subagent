@@ -76,7 +76,6 @@ interface ChildHarness {
 
 async function childHarness(
   overrides: {
-    capability?: 'inspect';
     extensionMode?: 'isolated' | 'ambient';
     limits?: Partial<ReturnType<typeof resolveSubagentLimits>>;
   } = {},
@@ -91,7 +90,6 @@ async function childHarness(
     launchNonce: 'n'.repeat(32),
     toolCallId: 'call-1',
     directive: 'answer with the word banana',
-    capability: overrides.capability ?? 'inspect',
     extensionMode: overrides.extensionMode ?? 'isolated',
     route,
     limits: { ...resolveSubagentLimits(route), ...overrides.limits },

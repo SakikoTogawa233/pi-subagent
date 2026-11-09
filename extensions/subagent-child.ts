@@ -26,14 +26,13 @@ import {
 } from './result-package.js';
 import { verifySubagentSeedBytes } from './seed.js';
 import {
-  SUBAGENT_CAPABILITIES,
   SUBAGENT_CHILD_ARTIFACT_READER_TOOL,
   SUBAGENT_CHILD_TERMINAL_SCHEMA_VERSION,
   SUBAGENT_RECEIPT_SCHEMA_VERSION,
   SUBAGENT_RUNTIME_BUDGET_SCHEMA_VERSION,
   SUBAGENT_TOOL_RESULT_CONTENT_SCHEMA_VERSION,
   type SubagentRouteAttestation,
-  type SubagentSeedV2,
+  type SubagentSeedV3,
   type SubagentSpillReceipt,
   type SubagentUsageReport,
 } from './types.js';
@@ -69,7 +68,7 @@ import {
  */
 
 interface GuardState {
-  seed: SubagentSeedV2;
+  seed: SubagentSeedV3;
   artifactDirAbs: string;
   turns: number;
   toolCalls: number;
@@ -407,10 +406,6 @@ export default function subagentChildExtension(pi: ExtensionAPI): void {
     taskId: expectedTaskId,
     launchNonce: expectedNonce,
   });
-
-  if (!SUBAGENT_CAPABILITIES.includes(seed.capability)) {
-    throw new Error(`subagent child cannot enforce capability ${seed.capability}`);
-  }
 
   const state: GuardState = {
     seed,

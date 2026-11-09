@@ -27,7 +27,7 @@ export const SUBAGENT_DEFAULT_MAX_TURNS = 24;
 export const SUBAGENT_DEFAULT_MAX_TOOL_CALLS = 120;
 export const SUBAGENT_DEFAULT_TIMEOUT_SECONDS = 1200;
 
-export const SUBAGENT_SEED_SCHEMA_VERSION = 'pi-subagent.seed.v2' as const;
+export const SUBAGENT_SEED_SCHEMA_VERSION = 'pi-subagent.seed.v3' as const;
 export const SUBAGENT_LEDGER_SCHEMA_VERSION = 'pi-subagent.ledger.v1' as const;
 export const SUBAGENT_RESULT_PACKAGE_SCHEMA_VERSION = 'pi-subagent.result.v1' as const;
 export const SUBAGENT_RECEIPT_SCHEMA_VERSION = 'pi-subagent.receipt.v1' as const;
@@ -77,12 +77,9 @@ export const SUBAGENT_RESULT_TOOL_NAME = 'subagent_result';
 export const SUBAGENT_RUN_ATTESTED_TOOL_NAME = 'subagent_run_attested';
 export const SUBAGENT_CHILD_ARTIFACT_READER_TOOL = 'subagent_read_artifact';
 
-export const SUBAGENT_CAPABILITIES = ['inspect'] as const;
-export type SubagentCapability = (typeof SUBAGENT_CAPABILITIES)[number];
-
 /**
  * Controls only Pi's ambient extension discovery for subagent children.
- * Tool and project-resource restrictions remain independently enforced.
+ * Project-resource isolation remains independently enforced.
  */
 export const SUBAGENT_EXTENSION_MODES = ['isolated', 'ambient'] as const;
 export type SubagentExtensionMode = (typeof SUBAGENT_EXTENSION_MODES)[number];
@@ -157,12 +154,11 @@ export interface SubagentTaskDirective {
   authority: 'explicit_text';
 }
 
-export interface SubagentSeedV2 {
+export interface SubagentSeedV3 {
   schema_version: typeof SUBAGENT_SEED_SCHEMA_VERSION;
   task_id: string;
   launch_nonce: string;
   cwd: string;
-  capability: SubagentCapability;
   extension_mode: SubagentExtensionMode;
   route: SubagentPinnedRoute;
   parent_system_prompt: string;
@@ -368,21 +364,6 @@ export class SubagentError extends Error {
     return lines.join('\n');
   }
 }
-
-/**
- * Tools the inspect capability permits.
- *
- * v1 is read-only by construction: no shell, no network, no edit/write, no
- * recursive delegation, no Fusion. The list is passed to `--tools`, so it is
- * enforced by the child's tool registry rather than by prompt text.
- */
-export const SUBAGENT_INSPECT_TOOLS: readonly string[] = [
-  'read',
-  'grep',
-  'find',
-  'ls',
-  SUBAGENT_CHILD_ARTIFACT_READER_TOOL,
-];
 
 /** Registry task ids for subagent-owned work are opaque service-allocated ids. */
 export const SUBAGENT_TASK_ID_PATTERN = /^s[0-9a-f]{32}$/;

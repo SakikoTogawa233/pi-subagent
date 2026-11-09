@@ -16,13 +16,9 @@ import {
   SUBAGENT_REQUIRED_HOOK_GUARANTEES,
   type SubagentHookContractEvidence,
 } from './hook-contract.js';
-import { SUBAGENT_FORBIDDEN_TOOLS } from './removed-surface.js';
 import { type BuiltSubagentSeed, buildSubagentSeed } from './seed.js';
 import {
-  SUBAGENT_CAPABILITIES,
-  SUBAGENT_INSPECT_TOOLS,
   SUBAGENT_RUN_TOOL_NAME,
-  type SubagentCapability,
   SubagentError,
   type SubagentExtensionMode,
   type SubagentLimits,
@@ -204,18 +200,6 @@ export function resolveSubagentAttributionExtensionPath(
   return candidate;
 }
 
-export function delegateToolsFor(capability: SubagentCapability): readonly string[] {
-  if (capability === 'inspect') return SUBAGENT_INSPECT_TOOLS;
-  throw new SubagentError(
-    `subagent_run capability ${capability} is not supported in this version`,
-    {
-      code: 'subagent_isolation_unsupported',
-      childCreated: false,
-      remediation: [`Supported capabilities: ${SUBAGENT_CAPABILITIES.join(', ')}.`],
-    },
-  );
-}
-
 function assertSubagentExtensionMode(mode: SubagentExtensionMode): void {
   if (mode === 'isolated' || mode === 'ambient') return;
   throw new SubagentError(`subagent_run extension mode ${String(mode)} is not supported`, {
@@ -227,7 +211,6 @@ function assertSubagentExtensionMode(mode: SubagentExtensionMode): void {
 
 export interface SubagentChildArgvInput {
   route: SubagentPinnedRoute;
-  capability: SubagentCapability;
   extensionMode: SubagentExtensionMode;
   childSessionId: string;
   childSessionDir: string;
@@ -250,15 +233,6 @@ export interface SubagentChildArgvInput {
  */
 export function buildSubagentChildArgv(input: SubagentChildArgvInput): string[] {
   assertSubagentExtensionMode(input.extensionMode);
-  const tools = delegateToolsFor(input.capability);
-  for (const forbidden of SUBAGENT_FORBIDDEN_TOOLS) {
-    if (tools.includes(forbidden)) {
-      throw new SubagentError(
-        `subagent_run capability ${input.capability} would enable the forbidden tool ${forbidden}`,
-        { code: 'subagent_isolation_unsupported', childCreated: false },
-      );
-    }
-  }
   const extensionPaths =
     input.route.provider === 'anthropic'
       ? [
@@ -281,11 +255,6 @@ export function buildSubagentChildArgv(input: SubagentChildArgvInput): string[] 
     input.childSessionId,
     '--session-dir',
     input.childSessionDir,
-    '--no-builtin-tools',
-    '--tools',
-    tools.join(','),
-    '--exclude-tools',
-    SUBAGENT_FORBIDDEN_TOOLS.join(','),
     ...(input.extensionMode === 'isolated' ? ['--no-extensions'] : []),
     '--no-skills',
     '--no-prompt-templates',
@@ -354,7 +323,7 @@ export function subagentChildEnv(
  */
 export function buildSubagentChildSystemPrompt(seedPathHint: string): string {
   return [
-    'You are a Pi subagent child process running one focused, read-only investigation on behalf of a parent agent.',
+    'You are a Pi subagent child process running one focused task on behalf of a parent agent.',
     '',
     `Your task seed is the JSON document at ${seedPathHint}. It contains the parent system prompt, the working directory, a directive object, and a conversation_projection.`,
     '',
@@ -364,7 +333,7 @@ export function buildSubagentChildSystemPrompt(seedPathHint: string): string {
     '',
     'Do not ask for omitted payloads and do not guess their contents. If a fact exists only inside omitted parent tool activity, say so plainly and answer from what is present.',
     '',
-    'You are inspect-only. You can read, search, and list files. You cannot run shell commands, edit or write files, reach the network, or start further subagents. Do not claim to have done so.',
+    'Use the tools available in this Pi session to complete the delegated task, including shell commands, file edits, and further delegation when needed.',
     '',
     'If a tool result is replaced by a spill receipt, the complete encoded content is on disk and nothing was truncated. Use subagent_read_artifact with an exact offset and length when you genuinely need lossless base64 bytes, then interpret them using the receipt content_format.',
     '',
@@ -378,7 +347,6 @@ export interface SubagentPreflightInput {
   ctx: ParentContextSource;
   toolCallId: string | undefined;
   prompt: string;
-  capability: SubagentCapability;
   extensionMode: SubagentExtensionMode;
   route: SubagentPinnedRoute;
   limitOverrides: SubagentLimitOverrides;
@@ -417,14 +385,14 @@ export function buildSubagentChildPrompt(seedSerialized: string, directive: stri
     'YOUR DIRECTIVE (authoritative; this is what you must answer):',
     directive,
     '',
-    'Investigate using your read-only tools, then finish with a single self-contained answer. Your final assistant message is what is returned to the parent.',
+    'Complete the task using your available tools, then finish with a single self-contained answer. Your final assistant message is what is returned to the parent.',
   ].join('\n');
 }
 
 /**
  * Complete pre-spawn preflight.
  *
- * Order is deliberate and is asserted by tests: hook contract, then capability,
+ * Order is deliberate and is asserted by tests: hook contract, extension mode,
  * then limits and route capacity, then seed construction, then admission. Every
  * one of these can refuse, and none of them has created a process, a session, or
  * an artifact by the time it does.
@@ -432,8 +400,6 @@ export function buildSubagentChildPrompt(seedSerialized: string, directive: stri
 export function preflightSubagentLaunch(input: SubagentPreflightInput): SubagentPreflightResult {
   assertSubagentHookContract(input.hookEvidence);
   assertSubagentExtensionMode(input.extensionMode);
-  // Validates the capability and proves the tool set contains nothing forbidden.
-  delegateToolsFor(input.capability);
   const limits = resolveSubagentLimits(input.route, input.limitOverrides);
   const taskId = makeSubagentTaskId();
   const launchNonce = makeSubagentLaunchNonce();
@@ -443,7 +409,6 @@ export function preflightSubagentLaunch(input: SubagentPreflightInput): Subagent
     launchNonce,
     toolCallId: input.toolCallId,
     directive: input.prompt,
-    capability: input.capability,
     extensionMode: input.extensionMode,
     route: input.route,
     limits,

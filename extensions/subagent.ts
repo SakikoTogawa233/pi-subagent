@@ -27,7 +27,6 @@ import type { SubagentRunSupervisor, SubagentSpawn } from './runner.js';
 import {
   SUBAGENT_ATTESTED_LAUNCH_DETAILS_SCHEMA_VERSION,
   SUBAGENT_AUTO_DELIVER_MODES,
-  SUBAGENT_CAPABILITIES,
   SUBAGENT_DEFAULT_MAX_TOOL_CALLS,
   SUBAGENT_DEFAULT_MAX_TURNS,
   SUBAGENT_DEFAULT_TIMEOUT_SECONDS,
@@ -39,7 +38,6 @@ import {
   SUBAGENT_RUN_TOOL_NAME,
   type SubagentAutoDeliverMode,
   type SubagentBudgetRouteSource,
-  type SubagentCapability,
   type SubagentDeliveryMode,
   SubagentError,
   type SubagentExtensionMode,
@@ -88,16 +86,10 @@ export const SubagentRunParams = Type.Object(
         },
       ),
     ),
-    capability: Type.Optional(
-      Type.String({
-        description:
-          'Capability profile. Only "inspect" (read/search/list, no shell, no writes, no network, no recursion) is supported.',
-      }),
-    ),
     extensionMode: Type.Optional(
       Type.String({
         description:
-          'Extension discovery: isolated | ambient. Default isolated. Ambient is for extension-registered providers and executes arbitrary discovered extension code, weakening process isolation.',
+          'Extension discovery: isolated | ambient. Default ambient, using normal Pi extension discovery. Isolated disables discovery without restricting built-in tools.',
       }),
     ),
     maxTurns: Type.Optional(
@@ -182,7 +174,6 @@ const RUN_PARAM_KEYS = new Set([
   'name',
   'prompt',
   'route',
-  'capability',
   'extensionMode',
   'maxTurns',
   'maxToolCalls',
@@ -273,17 +264,8 @@ function rejectUnknownKeys(
   }
 }
 
-function requireCapability(value: unknown): SubagentCapability {
-  if (value === undefined) return 'inspect';
-  if (value === 'inspect') return 'inspect';
-  throw new SubagentError(
-    `subagent_run capability must be one of ${SUBAGENT_CAPABILITIES.join(', ')}. Writable profiles are deliberately out of scope in this version.`,
-    { code: 'invalid_arguments', childCreated: false },
-  );
-}
-
 function requireExtensionMode(value: unknown): SubagentExtensionMode {
-  if (value === undefined) return 'isolated';
+  if (value === undefined) return 'ambient';
   if (value === 'isolated' || value === 'ambient') return value;
   throw new SubagentError(
     `subagent_run extensionMode must be one of ${SUBAGENT_EXTENSION_MODES.join(', ')}`,
@@ -537,15 +519,14 @@ function registerSubagentTools(
     name: SUBAGENT_RUN_TOOL_NAME,
     label: 'Subagent Run',
     description:
-      'Launch one background Pi subagent seeded with a frozen projection of the current conversation, then return a launch receipt immediately. The child has its own session, a route pinned at launch that is never substituted, and read-only tools. Extension discovery is isolated by default; ambient mode supports extension-registered providers but executes arbitrary discovered extension code. Retrieve its verified answer with subagent_result.',
+      'Launch one background Pi subagent seeded with a frozen projection of the current conversation, then return a launch receipt immediately. The child has its own session, a route pinned at launch that is never substituted, and normal Pi tools, including shell commands and file writes. Extension discovery is ambient by default; isolated mode disables discovery. Retrieve its verified answer with subagent_result.',
     promptSnippet:
-      'Delegate an investigation to a background subagent that already has this conversation as context',
+      'Delegate a task to a background subagent that already has this conversation as context',
     promptGuidelines: [
       'Use subagent_run when work should continue in the background and the worker needs what you already know: it is seeded with a projection of this conversation.',
-      'The prompt is authoritative. State exactly what you want investigated and what the answer should contain.',
-      'The subagent is inspect-only at the model-visible tool boundary: it can read, search, and list files, but cannot run shell commands, edit or write files, use the network, or delegate further.',
-      'Extension discovery is isolated by default. Use extensionMode:"ambient" only when the pinned provider is registered by an ambient user/project extension.',
-      'Ambient mode executes arbitrary discovered extension code in the child process. Tool allowlists do not sandbox extension code, so ambient mode weakens inspect-only process isolation.',
+      'The prompt is authoritative. State exactly what you want done and what the answer should contain.',
+      'The subagent can execute shell commands, edit and write files, and use discovered extension tools, including further delegation.',
+      'Ambient mode uses normal Pi extension discovery. Isolated mode disables discovered extensions but keeps normal built-in tools.',
       'Facts that exist only inside omitted tool output are not available to the subagent. Restate such findings in the prompt.',
       'subagent_run returns immediately. Do not poll; retrieve the answer with subagent_result after the terminal notification arrives.',
     ],
@@ -572,7 +553,6 @@ function registerSubagentTools(
       const prepared: SubagentRunParamsValue = { name, prompt };
       const route = requireRoute(args['route']);
       if (route !== undefined) prepared.route = route;
-      prepared.capability = requireCapability(args['capability']);
       prepared.extensionMode = requireExtensionMode(args['extensionMode']);
       prepared.autoDeliver = requireAutoDeliver(args['autoDeliver']);
       const maxTurns = optionalPositiveInteger(args['maxTurns'], 'maxTurns');
@@ -589,7 +569,6 @@ function registerSubagentTools(
     },
     async execute(toolCallId, params, _signal, _onUpdate, ctx) {
       const current = requireState();
-      const capability = requireCapability(params.capability);
       const extensionMode = requireExtensionMode(params.extensionMode);
       const autoDeliver = requireAutoDeliver(params.autoDeliver);
       const hookEvidence = await loadHookEvidence();
@@ -624,7 +603,6 @@ function registerSubagentTools(
         },
         toolCallId,
         prompt: params.prompt,
-        capability,
         extensionMode,
         route,
         limitOverrides: {
@@ -677,8 +655,7 @@ function registerSubagentTools(
             `Seed: ${String(Buffer.byteLength(prepared.preflight.seed.serialized, 'utf8'))} bytes, sha256 ${prepared.facts.seedSha256}`,
             `Child prompt: ${String(prepared.preflight.plan.child_prompt_utf8_bytes)} bytes; launch estimate ${String(prepared.preflight.plan.launch_input_tokens_upper_bound)} / ${String(prepared.preflight.plan.route.allowed_input_tokens)} allowed input tokens; protected retained-growth runway ${String(prepared.preflight.plan.retained_growth_budget_tokens)} tokens.`,
             `Estimator: family ${prepared.facts.budget.family}, source ${prepared.facts.budget.rate_source.source}, rate ${String(prepared.facts.budget.rate_source.effective_rate_bytes_per_token_x100)}/100 B/tok + ${String(prepared.facts.budget.rate_source.affine_f_tokens)} tokens${prepared.facts.budget.rate_source.warning === null ? '' : `; warning: ${prepared.facts.budget.rate_source.warning}`}`,
-            `Capability: ${capability} (read/search/list only)`,
-            `Extension mode: ${extensionMode}${extensionMode === 'ambient' ? ' — WARNING: arbitrary discovered extension code executes in the child; the tool allowlist does not sandbox it, so inspect-only process isolation is weakened.' : ' (ambient extension discovery disabled)'}`,
+            `Extension mode: ${extensionMode}${extensionMode === 'ambient' ? ' (normal Pi extension discovery enabled)' : ' (ambient extension discovery disabled)'}`,
             `Limits: ${String(prepared.preflight.limits.max_turns)} turns, ${String(prepared.preflight.limits.max_tool_calls)} tool calls, ${String(prepared.preflight.limits.timeout_seconds)}s`,
             `Auto-deliver: ${autoDeliver}`,
             (params.notifyOnCompletion ?? true)

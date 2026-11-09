@@ -1,6 +1,6 @@
 # pi-subagent
 
-One inspect-only background subagent for [Pi](https://github.com/earendil-works/pi):
+One background subagent with normal Pi tool access for [Pi](https://github.com/earendil-works/pi):
 a frozen conversation seed, a route pinned at launch that is never substituted, a
 hash-verified result data plane, and an opt-in attested single-child Pi run mode.
 
@@ -35,6 +35,13 @@ with the background-task service.
 Launch one background Pi subagent seeded with a frozen projection of the current
 conversation, then return a launch receipt immediately.
 
+Children use normal Pi tools, including `bash`, `edit`, and `write`, without a
+subagent-specific tool allowlist or denylist. Ambient extensions are loaded by
+default, so their tools (including further delegation) are available as usual.
+The former `capability: "inspect"` parameter has been removed; omit it in callers.
+New runs use seed schema `pi-subagent.seed.v3` without the capability field.
+Run limits, context budgeting, and result verification still apply.
+
 Parameters (closed schema):
 
 | key | type | default | notes |
@@ -42,8 +49,7 @@ Parameters (closed schema):
 | `name` | string | required | 2-6 words, shown in the bg footer dock |
 | `prompt` | string | required | authoritative instruction; the projected conversation is background only |
 | `route` | `{provider, model}` | current model | pinned at launch, never substituted |
-| `capability` | string | `"inspect"` | only `inspect` exists: read/search/list, no shell, no writes, no network, no recursion |
-| `extensionMode` | string | `"isolated"` | `ambient` executes arbitrary discovered extension code in the child and weakens isolation |
+| `extensionMode` | string | `"ambient"` | normal Pi extension discovery; `isolated` disables discovery without restricting built-in tools |
 | `maxTurns` | number | 24 | |
 | `maxToolCalls` | number | 120 | |
 | `timeoutSeconds` | number | 1200 | wall-clock; the child is killed when exceeded |

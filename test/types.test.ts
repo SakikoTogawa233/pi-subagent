@@ -2,13 +2,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { DELEGATE_REMOVED, SUBAGENT_FORBIDDEN_TOOLS } from '../extensions/removed-surface.js';
+import { DELEGATE_REMOVED } from '../extensions/removed-surface.js';
 import {
   SUBAGENT_BRANCH_FILTER_ID,
   SUBAGENT_CHILD_ARTIFACT_READER_TOOL,
   SUBAGENT_CONTEXT_POLICY_ID,
   SUBAGENT_EXTENSION_MODES,
-  SUBAGENT_INSPECT_TOOLS,
   SUBAGENT_RESULT_TOOL_NAME,
   SUBAGENT_RUN_ATTESTED_TOOL_NAME,
   SUBAGENT_RUN_TOOL_NAME,
@@ -39,41 +38,9 @@ describe('subagent domain naming', () => {
     expect(SUBAGENT_EXTENSION_MODES).toEqual(['isolated', 'ambient']);
   });
 
-  it('admits only domain task ids and inspect tools', () => {
+  it('admits only domain task ids', () => {
     expect(SUBAGENT_TASK_ID_PATTERN.test('s0123456789abcdef0123456789abcdef')).toBe(true);
     expect(SUBAGENT_TASK_ID_PATTERN.test('d0123456789abcdef0123456789abcdef')).toBe(false);
-    expect(SUBAGENT_INSPECT_TOOLS).toEqual([
-      'read',
-      'grep',
-      'find',
-      'ls',
-      'subagent_read_artifact',
-    ]);
-  });
-
-  it('forbids shell, write, network, background, fusion, and self-recursive tools', () => {
-    for (const forbidden of [
-      'bash',
-      'edit',
-      'write',
-      'bg_run',
-      'bg_delegate',
-      'bg_result',
-      'bg_kill',
-      'bg_status',
-      'bg_logs',
-      'bg_run_pi_attested',
-      'subagent_run',
-      'subagent_result',
-      'subagent_run_attested',
-      'fusion_reason',
-      'fusion_investigate',
-      'fusion_research',
-      'fusion_validate',
-    ]) {
-      expect(SUBAGENT_FORBIDDEN_TOOLS, forbidden).toContain(forbidden);
-      expect(SUBAGENT_INSPECT_TOOLS, forbidden).not.toContain(forbidden);
-    }
   });
 
   it('keeps no removed background-tasks agent surface as an active string', async () => {
@@ -94,7 +61,7 @@ describe('subagent domain naming', () => {
   it('confines removed names to the exclusion registry module', async () => {
     const raw = await readFile(join(repoRoot, 'extensions', 'removed-surface.ts'), 'utf8');
     const exported = [...raw.matchAll(/^export const ([A-Z_]+)/gm)].map((match) => match[1]);
-    expect(exported).toEqual(['DELEGATE_REMOVED', 'SUBAGENT_FORBIDDEN_TOOLS']);
+    expect(exported).toEqual(['DELEGATE_REMOVED']);
   });
 
   it('declares the removed surface it must not regress to', () => {
