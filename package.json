@@ -1,6 +1,6 @@
 {
   "name": "@sakiko233/pi-subagent",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "private": false,
   "description": "Pi extension for one background subagent with normal Pi tool access with a frozen conversation seed, verified result retrieval, and attested single-child Pi runs, built on the shared pi-background-tasks task service.",
   "keywords": [
